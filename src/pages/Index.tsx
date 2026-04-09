@@ -148,8 +148,9 @@ const Index = () => {
           <div className="mb-6">
             <div className="flex items-center justify-between mb-1">
               <div className="flex items-center gap-3">
+                {currentGroup && <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: currentGroup.color }} />}
                 {currentGroup && <span className="text-2xl">{currentGroup.icon}</span>}
-                <h1 className="text-xl font-semibold text-foreground">{viewTitle}</h1>
+                <h1 className="text-xl font-semibold text-foreground" style={currentGroup ? { color: currentGroup.color } : undefined}>{viewTitle}</h1>
               </div>
               {currentGroup && (
                 <div className="flex items-center gap-1">
@@ -206,6 +207,7 @@ const Index = () => {
                 <CommandCard
                   key={cmd.id}
                   cmd={cmd}
+                  groupColor={vault.data.groups.find(g => g.id === cmd.groupId)?.color}
                   onCopy={handleCopy}
                   onEdit={(c) => { setEditCmd(c); setCmdModal(true); }}
                   onDelete={(c) => setDeleteTarget({ type: "command", id: c.id, title: c.title })}

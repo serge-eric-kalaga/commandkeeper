@@ -89,6 +89,7 @@ export default function AppSidebar({
                 activeView === `group:${g.id}` ? "bg-surface-active text-foreground font-medium" : "text-sidebar-fg hover:bg-surface-hover"
               }`}
             >
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: g.color }} />
               <span className="text-base leading-none">{g.icon}</span>
               <span className="truncate">{g.name}</span>
               <span className="ml-auto text-xs text-sidebar-muted">{commandCount(g.id)}</span>
