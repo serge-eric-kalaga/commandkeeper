@@ -49,7 +49,8 @@ export default function GroupModal({ group, open, onClose, onSave }: Props) {
           </div>
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Icon</label>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <input value={icon} onChange={(e) => { const val = e.target.value; if ([...val].length <= 2) setIcon(val); }} className="w-10 h-9 text-center text-lg rounded-md border border-input bg-background focus:outline-none focus:ring-2 focus:ring-accent-blue" />
               {EMOJI_PRESETS.map((e) => (
                 <button key={e} onClick={() => setIcon(e)} className={`w-9 h-9 flex items-center justify-center rounded-md text-lg transition-colors ${icon === e ? "bg-surface-active ring-2 ring-accent-blue" : "bg-secondary hover:bg-surface-hover"}`}>{e}</button>
               ))}
