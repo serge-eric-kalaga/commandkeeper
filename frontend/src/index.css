@@ -1,0 +1,94 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 9%;
+    --card: 0 0% 98%;
+    --card-foreground: 0 0% 9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 9%;
+    --primary: 0 0% 9%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 45%;
+    --accent: 0 0% 96%;
+    --accent-foreground: 0 0% 9%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 0 0% 9%;
+    --radius: 0.5rem;
+
+    --sidebar-bg: 0 0% 97%;
+    --sidebar-border: 0 0% 91%;
+    --sidebar-fg: 0 0% 20%;
+    --sidebar-muted: 0 0% 55%;
+
+    --code-bg: 0 0% 95%;
+    --code-fg: 0 0% 15%;
+
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+
+    --surface-hover: 0 0% 94%;
+    --surface-active: 220 60% 95%;
+    --accent-blue: 220 90% 56%;
+    --accent-blue-foreground: 0 0% 100%;
+  }
+
+  .dark {
+    --background: 0 0% 4%;
+    --foreground: 0 0% 93%;
+    --card: 0 0% 7%;
+    --card-foreground: 0 0% 93%;
+    --popover: 0 0% 7%;
+    --popover-foreground: 0 0% 93%;
+    --primary: 0 0% 93%;
+    --primary-foreground: 0 0% 4%;
+    --secondary: 0 0% 11%;
+    --secondary-foreground: 0 0% 93%;
+    --muted: 0 0% 11%;
+    --muted-foreground: 0 0% 55%;
+    --accent: 0 0% 11%;
+    --accent-foreground: 0 0% 93%;
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 16%;
+    --input: 0 0% 16%;
+    --ring: 0 0% 83%;
+
+    --sidebar-bg: 0 0% 5%;
+    --sidebar-border: 0 0% 14%;
+    --sidebar-fg: 0 0% 85%;
+    --sidebar-muted: 0 0% 50%;
+
+    --code-bg: 0 0% 10%;
+    --code-fg: 0 0% 85%;
+
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+
+    --surface-hover: 0 0% 12%;
+    --surface-active: 220 40% 15%;
+    --accent-blue: 220 90% 56%;
+    --accent-blue-foreground: 0 0% 100%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+}
