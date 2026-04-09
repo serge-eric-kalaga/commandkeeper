@@ -31,7 +31,7 @@ export default function VariableModal({ open, command, onClose, onCopyWithValues
   const replace = () => {
     let result = command;
     Object.entries(values).forEach(([k, v]) => {
-      result = result.replaceAll(`{{${k}}}`, v);
+      result = result.split(`{{${k}}}`).join(v);
     });
     onCopyWithValues(result);
   };
