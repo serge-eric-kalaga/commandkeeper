@@ -4,6 +4,7 @@ import { Command } from "@/hooks/useCommandVault";
 
 interface Props {
   cmd: Command;
+  groupColor?: string;
   onCopy: (cmd: Command) => void;
   onEdit: (cmd: Command) => void;
   onDelete: (cmd: Command) => void;
@@ -11,12 +12,12 @@ interface Props {
   onTagClick: (tag: string) => void;
 }
 
-export default function CommandCard({ cmd, onCopy, onEdit, onDelete, onToggleFavorite, onTagClick }: Props) {
+export default function CommandCard({ cmd, groupColor, onCopy, onEdit, onDelete, onToggleFavorite, onTagClick }: Props) {
   const [expanded, setExpanded] = useState(false);
   const isLong = cmd.command.length > 80;
 
   return (
-    <div className="border border-border rounded-lg bg-card p-4 hover:border-muted-foreground/30 transition-colors animate-fade-in">
+    <div className="border border-border rounded-lg bg-card p-4 hover:border-muted-foreground/30 transition-colors animate-fade-in border-l-[3px]" style={{ borderLeftColor: groupColor || 'var(--border)' }}>
       {/* Title row */}
       <div className="flex items-start justify-between gap-2 mb-2">
         <h3 className="font-medium text-sm text-card-foreground leading-snug">{cmd.title}</h3>
