@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import {
-  Terminal, Star, FolderOpen, Plus, Download, Upload, Sun, Moon, Menu, X, LogOut, Loader2,
+  Star, FolderOpen, Plus, Download, Upload, Sun, Moon, Menu, X, LogOut, Loader2,
 } from "lucide-react";
 import { Group } from "@/hooks/useCommandVault";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -44,9 +44,12 @@ export default function AppSidebar({
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
-        <div className="flex items-center gap-2">
-          <Terminal className="w-5 h-5 text-accent-blue" />
-          <span className="font-semibold text-sm tracking-tight text-sidebar-fg">Command Keeper</span>
+        <div className="flex items-center justify-center flex-1">
+          <img
+            src="/icon.png"
+            alt="Command Keeper"
+            className="h-10 w-auto max-w-full rounded-sm"
+          />
         </div>
         <button onClick={onToggleTheme} className="p-1.5 rounded-md hover:bg-surface-hover transition-colors text-sidebar-muted">
           {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
