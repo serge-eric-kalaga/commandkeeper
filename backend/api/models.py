@@ -52,7 +52,6 @@ class Group(Base):
     commands: Mapped[list[Command]] = relationship(
         back_populates="group",
         cascade="all, delete-orphan",
-        passive_deletes=True,
     )
 
 

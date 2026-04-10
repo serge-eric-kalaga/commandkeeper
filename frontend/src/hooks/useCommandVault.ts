@@ -58,6 +58,31 @@ type ApiSearchResponse = {
   items: ApiCommand[];
 };
 
+type ApiImportRequest = {
+  groups: Array<{
+    source_id: number;
+    name: string;
+    description: string | null;
+    color: string;
+    icon: string;
+  }>;
+  commands: Array<{
+    source_group_id: number;
+    title: string;
+    command: string;
+    description: string | null;
+    default_variables: Record<string, string>;
+    tags: string[];
+    is_favorite: boolean;
+    copy_count: number;
+  }>;
+};
+
+type ApiImportResponse = {
+  groups_created: number;
+  commands_created: number;
+};
+
 function mapGroup(g: ApiGroup): Group {
   return {
     id: g.id,
@@ -89,6 +114,7 @@ function mapCommand(c: ApiCommand): Command {
 export function useCommandVault(token: string) {
   const [data, setData] = useState<VaultData>({ groups: [], commands: [] });
   const [loading, setLoading] = useState(true);
+  const [importing, setImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
@@ -247,30 +273,18 @@ export function useCommandVault(token: string) {
 
   // Import
   const importData = useCallback(async (imported: VaultData) => {
-    // Create groups first, keep mapping old->new.
-    const groupIdMap = new Map<number, number>();
-
-    for (const g of imported.groups) {
-      const created = await apiRequest<ApiGroup>("/groups", {
-        method: "POST",
-        token,
-        json: {
+    setImporting(true);
+    try {
+      const payload: ApiImportRequest = {
+        groups: imported.groups.map((g) => ({
+          source_id: g.id,
           name: g.name,
           description: g.description,
           color: g.color,
           icon: g.icon,
-        },
-      });
-      groupIdMap.set(g.id, created.id);
-    }
-
-    for (const c of imported.commands) {
-      const newGroupId = groupIdMap.get(c.groupId) ?? c.groupId;
-      await apiRequest<ApiCommand>("/commands", {
-        method: "POST",
-        token,
-        json: {
-          group_id: newGroupId,
+        })),
+        commands: imported.commands.map((c) => ({
+          source_group_id: c.groupId,
           title: c.title,
           command: c.command,
           description: c.description,
@@ -278,12 +292,20 @@ export function useCommandVault(token: string) {
           tags: c.tags,
           is_favorite: c.isFavorite,
           copy_count: c.copyCount,
-        },
-      });
-    }
+        })),
+      };
 
-    await reload();
-    return { groups: imported.groups.length, commands: imported.commands.length };
+      const res = await apiRequest<ApiImportResponse>("/import", {
+        method: "POST",
+        token,
+        json: payload,
+      });
+
+      await reload();
+      return { groups: res.groups_created, commands: res.commands_created };
+    } finally {
+      setImporting(false);
+    }
   }, [reload, token]);
 
   // Export
@@ -313,6 +335,7 @@ export function useCommandVault(token: string) {
   return {
     data,
     loading,
+    importing,
     error,
     addGroup, updateGroup, deleteGroup,
     addCommand, updateCommand, deleteCommand,

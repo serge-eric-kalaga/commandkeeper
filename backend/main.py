@@ -4,7 +4,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api import database
-from api.routers import auth_router, commands_router, groups_router, search_router
+from api.routers import (
+    auth_router,
+    commands_router,
+    groups_router,
+    imports_router,
+    search_router,
+)
 from api.routers.auth import ensure_default_admin
 from api.settings import settings
 
@@ -38,6 +44,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(groups_router)
 app.include_router(commands_router)
+app.include_router(imports_router)
 app.include_router(search_router)
 
 

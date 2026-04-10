@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import {
-  Terminal, Star, FolderOpen, Plus, Download, Upload, Sun, Moon, Menu, X, LogOut,
+  Terminal, Star, FolderOpen, Plus, Download, Upload, Sun, Moon, Menu, X, LogOut, Loader2,
 } from "lucide-react";
 import { Group } from "@/hooks/useCommandVault";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -9,6 +9,7 @@ interface SidebarProps {
   groups: Group[];
   commands: { groupId: number }[];
   loading?: boolean;
+  importing?: boolean;
   activeView: string;
   onViewChange: (view: string) => void;
   onNewGroup: () => void;
@@ -24,6 +25,7 @@ interface SidebarProps {
 export default function AppSidebar({
   groups, commands, activeView, onViewChange, onNewGroup,
   loading = false,
+  importing = false,
   onExport, onImport, onLogout, dark, onToggleTheme, onEditGroup, onDeleteGroup,
 }: SidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -125,8 +127,13 @@ export default function AppSidebar({
         <button onClick={onExport} title="Export JSON" className="p-2 rounded-md hover:bg-surface-hover text-sidebar-muted transition-colors">
           <Download className="w-4 h-4" />
         </button>
-        <button onClick={() => fileRef.current?.click()} title="Import JSON" className="p-2 rounded-md hover:bg-surface-hover text-sidebar-muted transition-colors">
-          <Upload className="w-4 h-4" />
+        <button
+          onClick={() => fileRef.current?.click()}
+          disabled={loading || importing}
+          title={importing ? "Importing..." : "Import JSON"}
+          className="p-2 rounded-md hover:bg-surface-hover text-sidebar-muted transition-colors disabled:opacity-50"
+        >
+          {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
         </button>
         <div className="flex-1" />
         <button

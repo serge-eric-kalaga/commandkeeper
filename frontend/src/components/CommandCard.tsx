@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Star, Copy, Pencil, Trash2, ChevronDown, ChevronUp } from "lucide-react";
+import { toast } from "sonner";
 import { Command } from "@/hooks/useCommandVault";
 
 function renderBash(commandText: string) {
@@ -117,7 +118,14 @@ export default function CommandCard({ cmd, groupColor, onCopy, onEdit, onDelete,
           Copied {cmd.copyCount} time{cmd.copyCount !== 1 ? "s" : ""}
         </span>
         <div className="flex items-center gap-1">
-          <button onClick={() => onCopy(cmd)} className="flex items-center gap-1 px-2 py-1 text-xs rounded-md hover:bg-surface-hover text-muted-foreground hover:text-foreground transition-colors">
+          <button
+            onClick={() => {
+              const hasVars = /\{\{\w+\}\}/.test(cmd.command);
+              onCopy(cmd);
+              if (!hasVars) toast.success("Copied!");
+            }}
+            className="flex items-center gap-1 px-2 py-1 text-xs rounded-md hover:bg-surface-hover text-muted-foreground hover:text-foreground transition-colors"
+          >
             <Copy className="w-3.5 h-3.5" /> Copy
           </button>
           <button onClick={() => onEdit(cmd)} className="flex items-center gap-1 px-2 py-1 text-xs rounded-md hover:bg-surface-hover text-muted-foreground hover:text-foreground transition-colors">

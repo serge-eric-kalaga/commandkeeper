@@ -15,6 +15,10 @@ export default defineConfig(({ mode }) => ({
         target: process.env.VITE_PROXY_TARGET ?? "http://localhost:2001",
         changeOrigin: true,
       },
+      "/import": {
+        target: process.env.VITE_PROXY_TARGET ?? "http://localhost:2001",
+        changeOrigin: true,
+      },
       "/groups": {
         target: process.env.VITE_PROXY_TARGET ?? "http://localhost:2001",
         changeOrigin: true,

@@ -160,3 +160,142 @@ def test_search_relevance_orders_by_matched_keywords(client):
     assert len(items) >= 2
     assert items[0]["id"] == strong["id"]
     assert any(item["id"] == weak["id"] for item in items)
+
+
+def test_deleting_group_deletes_its_commands(client):
+    login = _login(client, "admin", "admin")
+    token = login["access_token"]
+
+    res = client.post(
+        "/auth/change-password",
+        json={"old_password": "admin", "new_password": "admin123"},
+        headers=_auth_headers(token),
+    )
+    assert res.status_code == 200
+
+    login2 = _login(client, "admin", "admin123")
+    token2 = login2["access_token"]
+
+    res = client.post(
+        "/groups", json={"name": "Projet A"}, headers=_auth_headers(token2)
+    )
+    assert res.status_code == 201
+    group = res.json()
+
+    res = client.post(
+        "/commands",
+        json={
+            "group_id": group["id"],
+            "title": "Docker list",
+            "command": "docker ps -a",
+            "description": "list containers",
+            "tags": ["docker"],
+        },
+        headers=_auth_headers(token2),
+    )
+    assert res.status_code == 201
+    cmd = res.json()
+
+    res = client.delete(f"/groups/{group['id']}", headers=_auth_headers(token2))
+    assert res.status_code == 204
+
+    res = client.get(
+        "/commands", params={"group_id": group["id"]}, headers=_auth_headers(token2)
+    )
+    assert res.status_code == 200
+    assert res.json() == []
+
+    res = client.get(f"/commands/{cmd['id']}", headers=_auth_headers(token2))
+    assert res.status_code == 404
+
+
+def test_bulk_import_creates_groups_commands_and_tags(client):
+    login = _login(client, "admin", "admin")
+    token = login["access_token"]
+
+    res = client.post(
+        "/auth/change-password",
+        json={"old_password": "admin", "new_password": "admin123"},
+        headers=_auth_headers(token),
+    )
+    assert res.status_code == 200
+
+    login2 = _login(client, "admin", "admin123")
+    token2 = login2["access_token"]
+
+    payload = {
+        "groups": [
+            {
+                "source_id": 10,
+                "name": "Imported A",
+                "description": "Group A",
+                "color": "#3b82f6",
+                "icon": "📁",
+            },
+            {
+                "source_id": 11,
+                "name": "Imported B",
+                "description": None,
+                "color": "#3b82f6",
+                "icon": "📁",
+            },
+        ],
+        "commands": [
+            {
+                "source_group_id": 10,
+                "title": "Cmd 1",
+                "command": "echo 1",
+                "description": "d1",
+                "default_variables": {"FOO": "bar"},
+                "tags": ["Docker", "docker", " DevOps "],
+                "is_favorite": True,
+                "copy_count": 2,
+            },
+            {
+                "source_group_id": 11,
+                "title": "Cmd 2",
+                "command": "echo 2",
+                "description": None,
+                "default_variables": {},
+                "tags": [],
+                "is_favorite": False,
+                "copy_count": 0,
+            },
+        ],
+    }
+
+    res = client.post("/import", json=payload, headers=_auth_headers(token2))
+    assert res.status_code == 200
+    body = res.json()
+    assert body["groups_created"] == 2
+    assert body["commands_created"] == 2
+
+    res = client.get("/groups", headers=_auth_headers(token2))
+    assert res.status_code == 200
+    groups = res.json()
+    imported_a = next(g for g in groups if g["name"] == "Imported A")
+    imported_b = next(g for g in groups if g["name"] == "Imported B")
+
+    res = client.get(
+        "/commands",
+        params={"group_id": imported_a["id"]},
+        headers=_auth_headers(token2),
+    )
+    assert res.status_code == 200
+    cmds_a = res.json()
+    assert len(cmds_a) == 1
+    assert cmds_a[0]["title"] == "Cmd 1"
+    assert cmds_a[0]["default_variables"] == {"FOO": "bar"}
+    assert cmds_a[0]["is_favorite"] is True
+    assert cmds_a[0]["copy_count"] == 2
+    assert set(cmds_a[0]["tags"]) == {"docker", "devops"}
+
+    res = client.get(
+        "/commands",
+        params={"group_id": imported_b["id"]},
+        headers=_auth_headers(token2),
+    )
+    assert res.status_code == 200
+    cmds_b = res.json()
+    assert len(cmds_b) == 1
+    assert cmds_b[0]["title"] == "Cmd 2"

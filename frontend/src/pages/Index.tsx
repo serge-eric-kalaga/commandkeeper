@@ -139,7 +139,6 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
       void vault.incrementCopy(cmd.id).catch(() => {
         // ignore copy count sync errors
       });
-      toast.success("Copied!");
     }
   }, [vault]);
 
@@ -150,13 +149,21 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
       try {
         const imported = JSON.parse(e.target?.result as string) as VaultData;
         if (!imported.groups || !imported.commands) throw new Error();
+        const toastId = toast.loading("Importing...");
         void vault
           .importData(imported)
           .then(({ groups, commands }) => {
-            toast.success(`Imported successfully (${groups} groups, ${commands} commands)`);
+            toast.success(`Imported successfully (${groups} groups, ${commands} commands)`, { id: toastId });
+
+            // Ensure the newly imported data is visible immediately.
+            setSearch("");
+            setSearchResults(null);
+            setSearchLoading(false);
+            setTagFilter(null);
+            setActiveView("all");
           })
           .catch((err) => {
-            toast.error((err as any)?.message ?? "Import failed");
+            toast.error((err as any)?.message ?? "Import failed", { id: toastId });
           });
       } catch {
         toast.error("Invalid JSON file");
@@ -171,6 +178,7 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
         groups={vault.data.groups}
         commands={vault.data.commands}
         loading={vault.loading && vault.data.groups.length === 0 && vault.data.commands.length === 0}
+        importing={vault.importing}
         activeView={activeView}
         onViewChange={(v) => { setActiveView(v); setSearch(""); setTagFilter(null); }}
         onNewGroup={() => { setEditGroup(null); setGroupModal(true); }}
@@ -193,6 +201,13 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
               <Loader2 className="w-4 h-4 animate-spin" />
               Loading...
+            </div>
+          )}
+
+          {vault.importing && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Importing...
             </div>
           )}
 
