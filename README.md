@@ -74,6 +74,34 @@ docker compose up --build
 
 ---
 
+## 🌱 Seed (données d’exemple)
+
+Pour remplir la base avec des groupes + commandes (utile pour tester l’UI rapidement) :
+
+```bash
+docker compose run --rm backend uv run python scripts/seed_demo.py
+```
+
+Pour **réinitialiser** (supprime d’abord les groupes seedés, puis les recrée) :
+
+```bash
+docker compose run --rm backend uv run python scripts/seed_demo.py --reset
+```
+
+Pour **supprimer uniquement** les données seedées (sans réinsérer) :
+
+```bash
+docker compose run --rm backend uv run python scripts/seed_demo.py --delete-seeded
+```
+
+Notes :
+
+- Le script est idempotent : si les groupes seedés existent déjà, il ne recrée rien (sauf avec `--reset`).
+- La DB est persistée dans le volume Docker `backend_data` si tu utilises `DATABASE_URL=sqlite:////data/commandkeeper.db`.
+- `docker compose down -v` supprime les volumes (donc la DB), et tu peux relancer le seed ensuite.
+
+---
+
 ## 📦 Déploiement via Docker Hub (images pré-build)
 
 Le workflow GitHub Actions pousse 2 images :
