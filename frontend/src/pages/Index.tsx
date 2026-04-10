@@ -456,8 +456,8 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
 const Index = () => {
   const auth = useAuth();
 
-  const [loginUsername, setLoginUsername] = useState("admin");
-  const [loginPassword, setLoginPassword] = useState("admin");
+  const [loginUsername, setLoginUsername] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
 
   const [oldPassword, setOldPassword] = useState("");
@@ -505,9 +505,12 @@ const Index = () => {
   if (!auth.isAuthenticated) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-6">
-        <div className="w-full max-w-sm rounded-lg border border-input bg-background p-6">
-          <h1 className="text-lg font-semibold text-foreground mb-1">Sign in</h1>
-          <p className="text-sm text-muted-foreground mb-5">Sign in to access your commands.</p>
+        <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 sm:p-8 shadow-lg">
+          <div className="flex flex-col items-center text-center mb-6">
+            <img src="/icon.png" alt="Command Keeper" className="h-12 w-auto" />
+            <h1 className="text-xl font-semibold text-foreground mt-4">Welcome to Command Keeper</h1>
+            <p className="text-sm text-muted-foreground mt-1">Sign in to access your command library.</p>
+          </div>
 
           <div className="space-y-3">
             <div>
@@ -515,7 +518,7 @@ const Index = () => {
               <input
                 value={loginUsername}
                 onChange={(e) => setLoginUsername(e.target.value)}
-                className="w-full px-3 py-2 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent-blue"
+                className="w-full px-3 py-2.5 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent-blue"
               />
             </div>
             <div>
@@ -524,13 +527,13 @@ const Index = () => {
                 type="password"
                 value={loginPassword}
                 onChange={(e) => setLoginPassword(e.target.value)}
-                className="w-full px-3 py-2 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent-blue"
+                className="w-full px-3 py-2.5 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent-blue"
               />
             </div>
             <button
               disabled={loginLoading}
               onClick={handleLogin}
-              className="w-full px-4 py-2 text-sm rounded-md bg-accent-blue text-accent-blue-foreground hover:opacity-90 disabled:opacity-60 transition-all font-medium"
+              className="w-full px-4 py-2.5 text-sm rounded-md bg-accent-blue text-accent-blue-foreground hover:opacity-90 disabled:opacity-60 transition-all font-medium"
             >
               {loginLoading ? "Signing in..." : "Sign in"}
             </button>
@@ -543,9 +546,12 @@ const Index = () => {
   if (auth.mustChangePassword) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-6">
-        <div className="w-full max-w-sm rounded-lg border border-input bg-background p-6">
-          <h1 className="text-lg font-semibold text-foreground mb-1">Change password</h1>
-          <p className="text-sm text-muted-foreground mb-5">Required on your first login.</p>
+        <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 sm:p-8 shadow-lg">
+          <div className="flex flex-col items-center text-center mb-6">
+            <img src="/icon.png" alt="Command Keeper" className="h-12 w-auto" />
+            <h1 className="text-xl font-semibold text-foreground mt-4">Change your password</h1>
+            <p className="text-sm text-muted-foreground mt-1">Required on your first login.</p>
+          </div>
 
           <div className="space-y-3">
             <div>
@@ -554,7 +560,7 @@ const Index = () => {
                 type="password"
                 value={oldPassword}
                 onChange={(e) => setOldPassword(e.target.value)}
-                className="w-full px-3 py-2 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent-blue"
+                className="w-full px-3 py-2.5 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent-blue"
               />
             </div>
             <div>
@@ -564,21 +570,21 @@ const Index = () => {
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 minLength={6}
-                className="w-full px-3 py-2 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent-blue"
+                className="w-full px-3 py-2.5 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent-blue"
               />
               <p className="text-[11px] text-muted-foreground mt-1">Minimum 6 characters.</p>
             </div>
             <button
               disabled={!canSubmitPasswordChange}
               onClick={handleChangePassword}
-              className="w-full px-4 py-2 text-sm rounded-md bg-accent-blue text-accent-blue-foreground hover:opacity-90 disabled:opacity-60 transition-all font-medium"
+              className="w-full px-4 py-2.5 text-sm rounded-md bg-accent-blue text-accent-blue-foreground hover:opacity-90 disabled:opacity-60 transition-all font-medium"
             >
               {changeLoading ? "Updating..." : "Update"}
             </button>
 
             <button
               onClick={() => auth.logout()}
-              className="w-full px-4 py-2 text-sm rounded-md border border-input hover:bg-surface-hover transition-colors"
+              className="w-full px-4 py-2.5 text-sm rounded-md border border-input hover:bg-surface-hover transition-colors"
             >
               Sign out
             </button>
