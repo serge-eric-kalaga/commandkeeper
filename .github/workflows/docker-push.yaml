@@ -23,25 +23,25 @@ jobs:
             image: kalagaserge/commandkeeper-frontend
     steps:
       - name: Checkout the repository
-        run: echo "🔄 Récupération du code source..."
+        run: echo "🔄 Checking out source code..."
       - uses: actions/checkout@v4
       
       - name: Set up Docker Buildx
-        run: echo "🔧 Configuration de Docker Buildx..."
+        run: echo "🔧 Setting up Docker Buildx..."
       - uses: docker/setup-buildx-action@v3
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       
       - name: Login to Docker Hub
-        run: echo "🔐 Connexion à Docker Hub..."
+        run: echo "🔐 Logging in to Docker Hub..."
       - uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_ACCESS_TOKEN }}
           
       - name: Extract metadata for Docker
-        run: echo "🏷️ Extraction des métadonnées Docker (${{ matrix.service }})..."
+        run: echo "🏷️ Extracting Docker metadata (${{ matrix.service }})..."
 
       - name: Extract metadata (labels, tags, etc.) for Docker
         id: meta
@@ -52,9 +52,9 @@ jobs:
             type=raw,value=latest
             type=sha
           
-      - name: Build and push Docker image
-        run: echo "🔨 Construction et publication de l'image Docker multi-plateforme (${{ matrix.service }})..."
-      - uses: docker/build-push-action@v5
+      - name: Build and push Docker image (${{ matrix.service }})
+        id: build
+        uses: docker/build-push-action@v5
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
@@ -64,3 +64,21 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Job summary (${{ matrix.service }})
+        if: always()
+        run: |
+          {
+            echo "## 🐳 Docker push summary — ${{ matrix.service }}"
+            echo
+            echo "- **Image**: \`${{ matrix.image }}\`"
+            echo "- **Context**: \`${{ matrix.context }}\`"
+            echo "- **Dockerfile**: \`${{ matrix.dockerfile }}\`"
+            echo "- **Digest**: \`${{ steps.build.outputs.digest }}\`"
+            echo
+            echo "### 🏷️ Tags pushed"
+            echo
+            echo "\`\`\`"
+            echo "${{ steps.meta.outputs.tags }}"
+            echo "\`\`\`"
+          } >> "$GITHUB_STEP_SUMMARY"
