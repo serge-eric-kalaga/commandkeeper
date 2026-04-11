@@ -30,6 +30,12 @@ export interface VaultData {
   commands: Command[];
 }
 
+export interface CommandStats {
+  total: number;
+  favorites: number;
+  byGroup: Record<number, number>;
+}
+
 type ApiGroup = {
   id: number;
   name: string;
@@ -56,6 +62,19 @@ type ApiCommand = {
 
 type ApiSearchResponse = {
   items: ApiCommand[];
+};
+
+type ApiCommandsPageResponse = {
+  items: ApiCommand[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
+type ApiCommandStatsResponse = {
+  total: number;
+  favorites: number;
+  by_group: Record<string, number>;
 };
 
 type ApiImportRequest = {
@@ -117,19 +136,99 @@ export function useCommandVault(token: string) {
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [stats, setStats] = useState<CommandStats>({ total: 0, favorites: 0, byGroup: {} });
+
+  const [commandsLoading, setCommandsLoading] = useState(false);
+  const [commandsLoadingMore, setCommandsLoadingMore] = useState(false);
+  const [commandsHasMore, setCommandsHasMore] = useState(false);
+  const [commandsTotal, setCommandsTotal] = useState(0);
+  const [commandsOffset, setCommandsOffset] = useState(0);
+  const commandsLimit = 30;
+  const [commandsView, setCommandsView] = useState<{ groupId?: number; favoritesOnly?: boolean }>({});
+
+  const fetchStats = useCallback(async () => {
+    const res = await apiRequest<ApiCommandStatsResponse>("/commands/stats", { token });
+    const byGroup: Record<number, number> = {};
+    for (const [k, v] of Object.entries(res.by_group ?? {})) {
+      const gid = Number(k);
+      if (!Number.isNaN(gid)) byGroup[gid] = v;
+    }
+    setStats({ total: res.total ?? 0, favorites: res.favorites ?? 0, byGroup });
+  }, [token]);
+
+  const fetchCommandsPage = useCallback(async (opts: { groupId?: number; favoritesOnly?: boolean; limit: number; offset: number }) => {
+    const res = await apiRequest<ApiCommandsPageResponse>("/commands/paged", {
+      token,
+      query: {
+        group_id: opts.groupId,
+        is_favorite: opts.favoritesOnly ? true : undefined,
+        limit: opts.limit,
+        offset: opts.offset,
+      },
+    });
+
+    return {
+      items: res.items.map(mapCommand),
+      total: res.total,
+      limit: res.limit,
+      offset: res.offset,
+    };
+  }, [token]);
+
+  const loadInitialCommands = useCallback(async (view: { groupId?: number; favoritesOnly?: boolean }) => {
+    setCommandsLoading(true);
+    setCommandsView(view);
+    try {
+      const page = await fetchCommandsPage({ ...view, limit: commandsLimit, offset: 0 });
+      setData((prev) => ({ ...prev, commands: page.items }));
+      setCommandsTotal(page.total);
+      setCommandsOffset(page.items.length);
+      setCommandsHasMore(page.items.length < page.total);
+    } finally {
+      setCommandsLoading(false);
+    }
+  }, [fetchCommandsPage]);
+
+  const loadMoreCommands = useCallback(async () => {
+    if (commandsLoading || commandsLoadingMore || !commandsHasMore) return;
+    setCommandsLoadingMore(true);
+    try {
+      const page = await fetchCommandsPage({
+        ...commandsView,
+        limit: commandsLimit,
+        offset: commandsOffset,
+      });
+
+      setData((prev) => {
+        const known = new Set(prev.commands.map((c) => c.id));
+        const merged = [...prev.commands];
+        for (const item of page.items) {
+          if (known.has(item.id)) continue;
+          known.add(item.id);
+          merged.push(item);
+        }
+        return { ...prev, commands: merged };
+      });
+      const nextOffset = commandsOffset + page.items.length;
+      setCommandsOffset(nextOffset);
+      setCommandsTotal(page.total);
+      setCommandsHasMore(nextOffset < page.total);
+    } finally {
+      setCommandsLoadingMore(false);
+    }
+  }, [commandsHasMore, commandsLoading, commandsLoadingMore, commandsOffset, commandsView, fetchCommandsPage]);
+
   const reload = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const [groups, commands] = await Promise.all([
-      apiRequest<ApiGroup[]>("/groups", { token }),
-      apiRequest<ApiCommand[]>("/commands", { token }),
+    const groups = await apiRequest<ApiGroup[]>("/groups", { token });
+    setData((prev) => ({ ...prev, groups: groups.map(mapGroup) }));
+    await Promise.all([
+      fetchStats(),
+      loadInitialCommands(commandsView),
     ]);
-    setData({
-      groups: groups.map(mapGroup),
-      commands: commands.map(mapCommand),
-    });
     setLoading(false);
-  }, [token]);
+  }, [commandsView, fetchStats, loadInitialCommands, token]);
 
   useEffect(() => {
     let cancelled = false;
@@ -137,15 +236,16 @@ export function useCommandVault(token: string) {
       try {
         setLoading(true);
         setError(null);
-        const [groups, commands] = await Promise.all([
-          apiRequest<ApiGroup[]>("/groups", { token }),
-          apiRequest<ApiCommand[]>("/commands", { token }),
-        ]);
+        const groups = await apiRequest<ApiGroup[]>("/groups", { token });
         if (cancelled) return;
-        setData({
-          groups: groups.map(mapGroup),
-          commands: commands.map(mapCommand),
-        });
+        setData({ groups: groups.map(mapGroup), commands: [] });
+
+        await Promise.all([
+          fetchStats(),
+          loadInitialCommands({}),
+        ]);
+
+        if (cancelled) return;
         setLoading(false);
       } catch {
         if (cancelled) return;
@@ -157,12 +257,16 @@ export function useCommandVault(token: string) {
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [fetchStats, loadInitialCommands, token]);
 
   const persist = useCallback((next: VaultData) => {
     // Backend is the source of truth; keep this for compatibility.
     setData(next);
   }, []);
+
+  const setCommandsViewAndReload = useCallback(async (view: { groupId?: number; favoritesOnly?: boolean }) => {
+    await loadInitialCommands(view);
+  }, [loadInitialCommands]);
 
   // Groups
   const addGroup = useCallback(async (g: Omit<Group, "id" | "createdAt" | "updatedAt">) => {
@@ -181,7 +285,8 @@ export function useCommandVault(token: string) {
       ...prev,
       groups: [...prev.groups, mapped].sort((a, b) => a.name.localeCompare(b.name)),
     }));
-  }, [token]);
+    await fetchStats();
+  }, [fetchStats, token]);
 
   const updateGroup = useCallback(async (id: number, updates: Partial<Group>) => {
     const updated = await apiRequest<ApiGroup>(`/groups/${id}`, {
@@ -207,7 +312,8 @@ export function useCommandVault(token: string) {
       groups: prev.groups.filter((g) => g.id !== id),
       commands: prev.commands.filter((c) => c.groupId !== id),
     }));
-  }, [token]);
+    await fetchStats();
+  }, [fetchStats, token]);
 
   // Commands
   const addCommand = useCallback(async (c: Omit<Command, "id" | "createdAt" | "updatedAt">) => {
@@ -226,11 +332,14 @@ export function useCommandVault(token: string) {
       },
     });
     const mapped = mapCommand(created);
-    setData((prev) => ({
-      ...prev,
-      commands: [mapped, ...prev.commands],
-    }));
-  }, [token]);
+    setData((prev) => {
+      const matchesGroup = commandsView.groupId == null || commandsView.groupId === mapped.groupId;
+      const matchesFav = !commandsView.favoritesOnly || mapped.isFavorite;
+      if (!matchesGroup || !matchesFav) return prev;
+      return { ...prev, commands: [mapped, ...prev.commands] };
+    });
+    await fetchStats();
+  }, [commandsView.favoritesOnly, commandsView.groupId, fetchStats, token]);
 
   const updateCommand = useCallback(async (id: number, updates: Partial<Command>) => {
     const updated = await apiRequest<ApiCommand>(`/commands/${id}`, {
@@ -248,16 +357,32 @@ export function useCommandVault(token: string) {
       },
     });
     const mapped = mapCommand(updated);
-    setData((prev) => ({
-      ...prev,
-      commands: prev.commands.map((c) => (c.id === id ? mapped : c)),
-    }));
-  }, [token]);
+    setData((prev) => {
+      const exists = prev.commands.some((c) => c.id === id);
+      const matchesGroup = commandsView.groupId == null || commandsView.groupId === mapped.groupId;
+      const matchesFav = !commandsView.favoritesOnly || mapped.isFavorite;
+
+      if (!matchesGroup || !matchesFav) {
+        // If the item is visible in the current list but no longer matches, remove it.
+        return { ...prev, commands: prev.commands.filter((c) => c.id !== id) };
+      }
+
+      if (!exists) {
+        // It matches current filters but isn't in the loaded slice (e.g. toggled fav from another view)
+        // Don't force-insert; next refresh/page load will include it.
+        return prev;
+      }
+
+      return { ...prev, commands: prev.commands.map((c) => (c.id === id ? mapped : c)) };
+    });
+    await fetchStats();
+  }, [commandsView.favoritesOnly, commandsView.groupId, fetchStats, token]);
 
   const deleteCommand = useCallback(async (id: number) => {
     await apiRequest(`/commands/${id}`, { method: "DELETE", token });
     setData((prev) => ({ ...prev, commands: prev.commands.filter((c) => c.id !== id) }));
-  }, [token]);
+    await fetchStats();
+  }, [fetchStats, token]);
 
   const toggleFavorite = useCallback(async (id: number) => {
     const current = data.commands.find((c) => c.id === id);
@@ -310,14 +435,30 @@ export function useCommandVault(token: string) {
 
   // Export
   const exportData = useCallback(() => {
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `command-vault-export-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [data]);
+    void (async () => {
+      const groups = await apiRequest<ApiGroup[]>("/groups", { token });
+      const mappedGroups = groups.map(mapGroup);
+
+      const allCommands: Command[] = [];
+      const limit = 200;
+      let offset = 0;
+      while (true) {
+        const page = await fetchCommandsPage({ limit, offset });
+        allCommands.push(...page.items);
+        offset += page.items.length;
+        if (offset >= page.total || page.items.length === 0) break;
+      }
+
+      const payload: VaultData = { groups: mappedGroups, commands: allCommands };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `command-vault-export-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    })();
+  }, [fetchCommandsPage, token]);
 
   const searchCommands = useCallback(async (q: string, options?: { groupId?: number; limit?: number }) => {
     const res = await apiRequest<ApiSearchResponse>("/search", {
@@ -335,6 +476,11 @@ export function useCommandVault(token: string) {
   return {
     data,
     loading,
+    commandsLoading,
+    commandsLoadingMore,
+    commandsHasMore,
+    commandsTotal,
+    stats,
     importing,
     error,
     addGroup, updateGroup, deleteGroup,
@@ -343,5 +489,7 @@ export function useCommandVault(token: string) {
     importData, exportData, persist,
     reload,
     searchCommands,
+    setCommandsView: setCommandsViewAndReload,
+    loadMoreCommands,
   };
 }

@@ -1,6 +1,5 @@
-import { useState } from "react";
-import { Star, Copy, Pencil, Trash2, ChevronDown, ChevronUp } from "lucide-react";
-import { toast } from "sonner";
+import { useEffect, useRef, useState } from "react";
+import { Star, Copy, Check, Pencil, Trash2, ChevronDown, ChevronUp } from "lucide-react";
 import { Command } from "@/hooks/useCommandVault";
 
 function renderBash(commandText: string) {
@@ -63,7 +62,15 @@ interface Props {
 
 export default function CommandCard({ cmd, groupColor, onCopy, onEdit, onDelete, onToggleFavorite, onTagClick }: Props) {
   const [expanded, setExpanded] = useState(false);
+  const [justCopied, setJustCopied] = useState(false);
+  const copiedTimeoutRef = useRef<number | null>(null);
   const isLong = cmd.command.length > 80;
+
+  useEffect(() => {
+    return () => {
+      if (copiedTimeoutRef.current) window.clearTimeout(copiedTimeoutRef.current);
+    };
+  }, []);
 
   return (
     <div className="border border-border rounded-lg bg-card p-4 hover:border-muted-foreground/30 transition-colors animate-fade-in border-l-[3px]" style={{ borderLeftColor: groupColor || 'var(--border)' }}>
@@ -122,11 +129,15 @@ export default function CommandCard({ cmd, groupColor, onCopy, onEdit, onDelete,
             onClick={() => {
               const hasVars = /\{\{\w+\}\}/.test(cmd.command);
               onCopy(cmd);
-              if (!hasVars) toast.success("Copied!");
+              if (!hasVars) {
+                setJustCopied(true);
+                if (copiedTimeoutRef.current) window.clearTimeout(copiedTimeoutRef.current);
+                copiedTimeoutRef.current = window.setTimeout(() => setJustCopied(false), 1000);
+              }
             }}
             className="flex items-center gap-1 px-2 py-1 text-xs rounded-md hover:bg-surface-hover text-muted-foreground hover:text-foreground transition-colors"
           >
-            <Copy className="w-3.5 h-3.5" /> Copy
+            {justCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />} {justCopied ? "Copied" : "Copy"}
           </button>
           <button onClick={() => onEdit(cmd)} className="flex items-center gap-1 px-2 py-1 text-xs rounded-md hover:bg-surface-hover text-muted-foreground hover:text-foreground transition-colors">
             <Pencil className="w-3.5 h-3.5" /> Edit

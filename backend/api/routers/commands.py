@@ -1,13 +1,19 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from ..database import get_db
 from ..deps import require_ready_user
 from ..models import Command, Group, Tag
-from ..schemas import CommandCreate, CommandOut, CommandUpdate
+from ..schemas import (
+    CommandCreate,
+    CommandOut,
+    CommandStatsResponse,
+    CommandsPageResponse,
+    CommandUpdate,
+)
 
 router = APIRouter(
     prefix="/commands", tags=["commands"], dependencies=[Depends(require_ready_user)]
@@ -62,6 +68,71 @@ def list_commands(
     if group_id is not None:
         stmt = stmt.where(Command.group_id == group_id)
     return list(db.scalars(stmt).all())
+
+
+@router.get("/paged", response_model=CommandsPageResponse)
+def list_commands_paged(
+    group_id: int | None = Query(default=None),
+    is_favorite: bool | None = Query(default=None),
+    q: str | None = Query(default=None),
+    tag: list[str] | None = Query(default=None),
+    limit: int = Query(default=20, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+) -> CommandsPageResponse:
+    where = []
+    if group_id is not None:
+        where.append(Command.group_id == group_id)
+    if is_favorite is not None:
+        where.append(Command.is_favorite == is_favorite)
+
+    q_norm = (q or "").strip().lower()
+    if q_norm:
+        desc_col = func.coalesce(Command.description, "")
+        where.append(
+            or_(
+                func.lower(Command.title).contains(q_norm),
+                func.lower(Command.command).contains(q_norm),
+                func.lower(desc_col).contains(q_norm),
+            )
+        )
+
+    if tag:
+        normalized = [t.strip().lower() for t in tag if (t or "").strip()]
+        if normalized:
+            where.append(Command.tag_entities.any(Tag.name.in_(normalized)))
+
+    total_stmt = select(func.count(Command.id))
+    if where:
+        total_stmt = total_stmt.where(*where)
+    total = int(db.scalar(total_stmt) or 0)
+
+    stmt = (
+        select(Command)
+        .options(selectinload(Command.tag_entities))
+        .order_by(Command.updated_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    if where:
+        stmt = stmt.where(*where)
+
+    items = list(db.scalars(stmt).all())
+    return CommandsPageResponse(items=items, total=total, limit=limit, offset=offset)
+
+
+@router.get("/stats", response_model=CommandStatsResponse)
+def command_stats(db: Session = Depends(get_db)) -> CommandStatsResponse:
+    total = int(db.scalar(select(func.count(Command.id))) or 0)
+    favorites = int(
+        db.scalar(select(func.count(Command.id)).where(Command.is_favorite == True))
+        or 0
+    )
+    rows = db.execute(
+        select(Command.group_id, func.count(Command.id)).group_by(Command.group_id)
+    ).all()
+    by_group = {int(group_id): int(cnt) for group_id, cnt in rows}
+    return CommandStatsResponse(total=total, favorites=favorites, by_group=by_group)
 
 
 @router.post("", response_model=CommandOut, status_code=status.HTTP_201_CREATED)

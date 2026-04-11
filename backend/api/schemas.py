@@ -93,5 +93,18 @@ class CommandOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class CommandsPageResponse(BaseModel):
+    items: list[CommandOut]
+    total: int
+    limit: int
+    offset: int
+
+
+class CommandStatsResponse(BaseModel):
+    total: int
+    favorites: int
+    by_group: dict[int, int]
+
+
 class SearchResponse(BaseModel):
     items: list[CommandOut]

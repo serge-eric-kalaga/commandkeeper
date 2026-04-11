@@ -2,12 +2,18 @@ import { useState, useRef } from "react";
 import {
   Star, FolderOpen, Plus, Download, Upload, Sun, Moon, Menu, X, LogOut, Loader2,
 } from "lucide-react";
-import { Group } from "@/hooks/useCommandVault";
+import { Group, CommandStats } from "@/hooks/useCommandVault";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface SidebarProps {
   groups: Group[];
-  commands: { groupId: number }[];
+  stats: CommandStats;
   loading?: boolean;
   importing?: boolean;
   activeView: string;
@@ -23,7 +29,7 @@ interface SidebarProps {
 }
 
 export default function AppSidebar({
-  groups, commands, activeView, onViewChange, onNewGroup,
+  groups, stats, activeView, onViewChange, onNewGroup,
   loading = false,
   importing = false,
   onExport, onImport, onLogout, dark, onToggleTheme, onEditGroup, onDeleteGroup,
@@ -31,8 +37,8 @@ export default function AppSidebar({
   const [mobileOpen, setMobileOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const commandCount = (groupId: number) => commands.filter((c) => c.groupId === groupId).length;
-  const favCount = (commands as any[]).filter((c) => c.isFavorite).length;
+  const commandCount = (groupId: number) => stats.byGroup[groupId] ?? 0;
+  const favCount = stats.favorites ?? 0;
 
   const nav = (view: string) => {
     if (loading) return;
@@ -67,7 +73,7 @@ export default function AppSidebar({
           <FolderOpen className="w-4 h-4" />
           <span>All Commands</span>
           <span className="ml-auto text-xs text-sidebar-muted">
-            {loading ? <Skeleton className="h-3 w-6" /> : commands.length}
+            {loading ? <Skeleton className="h-3 w-6" /> : (stats.total ?? 0)}
           </span>
         </button>
 
@@ -127,17 +133,31 @@ export default function AppSidebar({
 
       {/* Footer */}
       <div className="p-3 border-t border-sidebar-border flex items-center gap-1">
-        <button onClick={onExport} title="Export JSON" className="p-2 rounded-md hover:bg-surface-hover text-sidebar-muted transition-colors">
-          <Download className="w-4 h-4" />
-        </button>
-        <button
-          onClick={() => fileRef.current?.click()}
-          disabled={loading || importing}
-          title={importing ? "Importing..." : "Import JSON"}
-          className="p-2 rounded-md hover:bg-surface-hover text-sidebar-muted transition-colors disabled:opacity-50"
-        >
-          {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-        </button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              title="Import/Export"
+              className="p-2 rounded-md hover:bg-surface-hover text-sidebar-muted transition-colors"
+            >
+              {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-40">
+            <DropdownMenuItem
+              onSelect={() => fileRef.current?.click()}
+              disabled={loading || importing}
+              className="gap-2"
+            >
+              <Upload className="w-4 h-4" />
+              Importer
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={onExport} className="gap-2">
+              <Download className="w-4 h-4" />
+              Exporter
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <div className="flex-1" />
         <button
           onClick={() => {

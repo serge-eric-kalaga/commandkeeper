@@ -20,7 +20,7 @@ router = APIRouter(
 def search_commands(
     q: str = Query(min_length=1),
     group_id: int | None = Query(default=None),
-    limit: int = Query(default=50, ge=1, le=200),
+    limit: int = Query(default=20, ge=1, le=200),
     db: Session = Depends(get_db),
 ) -> SearchResponse:
     q_norm = q.strip().lower()

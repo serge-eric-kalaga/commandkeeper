@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { Search, Plus, FileCode, Loader2, LayoutGrid, LayoutList, ArrowDownUp } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { Search, Plus, FileCode, Loader2, LayoutGrid, LayoutList, ArrowDownUp, ArrowUp } from "lucide-react";
 import { toast } from "sonner";
 import { useCommandVault, Command, Group, VaultData } from "@/hooks/useCommandVault";
 import { useTheme } from "@/hooks/useTheme";
@@ -16,9 +16,16 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
   const vault = useCommandVault(token);
   const theme = useTheme();
 
+  const loadMoreCommands = vault.loadMoreCommands;
+  const setCommandsView = vault.setCommandsView;
+
   const [activeView, setActiveView] = useState("all");
   const [search, setSearch] = useState("");
-  const [tagFilter, setTagFilter] = useState<string | null>(null);
+  const [tagFilters, setTagFilters] = useState<string[]>([]);
+  const [tagsExpanded, setTagsExpanded] = useState(false);
+  const [tagsOverflow, setTagsOverflow] = useState(false);
+  const tagsContainerRef = useRef<HTMLDivElement | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const [layout, setLayout] = useState<"vertical" | "horizontal">("vertical");
   const [sortMode, setSortMode] = useState<"recent" | "mostCopied">("recent");
 
@@ -32,6 +39,12 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
   const [editCmd, setEditCmd] = useState<Command | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ type: "command" | "group"; id: number; title: string } | null>(null);
   const [varModal, setVarModal] = useState<Command | null>(null);
+
+  const viewToOptions = useCallback((view: string): { groupId?: number; favoritesOnly?: boolean } => {
+    if (view === "favorites") return { favoritesOnly: true };
+    if (view.startsWith("group:")) return { groupId: Number(view.slice(6)) };
+    return {};
+  }, []);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -51,20 +64,21 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
-  // Filtered commands
-  const filteredCommands = useMemo(() => {
+  // Base commands set for the current view/search (without tag filters).
+  // This is used to keep the tag list stable when selecting multiple tags.
+  const baseCommands = useMemo(() => {
     const isServerSearch = search.trim().length > 0;
-    let cmds = isServerSearch ? [...(searchResults ?? [])] : [...vault.data.commands];
+    const cmds = isServerSearch ? [...(searchResults ?? [])] : [...vault.data.commands];
+    // vault.data.commands is already loaded for the current view.
+    return cmds;
+  }, [vault.data.commands, activeView, search, searchResults]);
 
-    if (activeView === "favorites") {
-      cmds = cmds.filter((c) => c.isFavorite);
-    } else if (activeView.startsWith("group:")) {
-      const gid = Number(activeView.slice(6));
-      cmds = cmds.filter((c) => c.groupId === gid);
-    }
+  // Filtered commands (applies tag filters + sorting)
+  const filteredCommands = useMemo(() => {
+    let cmds = [...baseCommands];
 
-    if (tagFilter) {
-      cmds = cmds.filter((c) => c.tags.includes(tagFilter));
+    if (tagFilters.length > 0) {
+      cmds = cmds.filter((c) => tagFilters.some((t) => c.tags.includes(t)));
     }
 
     if (sortMode === "mostCopied") {
@@ -75,7 +89,11 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
     }
 
     return cmds;
-  }, [vault.data.commands, activeView, search, tagFilter, sortMode, searchResults]);
+  }, [baseCommands, tagFilters, sortMode]);
+
+  const toggleTagFilter = useCallback((tag: string) => {
+    setTagFilters((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]));
+  }, []);
 
   // Server-side search
   useEffect(() => {
@@ -122,12 +140,29 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
 
   const viewTitle = activeView === "all" ? "All Commands" : activeView === "favorites" ? "Favorites" : currentGroup?.name ?? "Commands";
 
-  // All tags for filter
+  // All tags for filter (from baseCommands so tags don't disappear when filtering)
   const allTags = useMemo(() => {
     const tags = new Set<string>();
-    filteredCommands.forEach((c) => c.tags.forEach((t) => tags.add(t)));
+    baseCommands.forEach((c) => c.tags.forEach((t) => tags.add(t)));
     return [...tags].sort();
-  }, [filteredCommands]);
+  }, [baseCommands]);
+
+  useEffect(() => {
+    const el = tagsContainerRef.current;
+    if (!el) return;
+
+    const computeOverflow = () => {
+      // Keep previous value while expanded so the collapse button stays visible.
+      if (tagsExpanded) return;
+      setTagsOverflow(el.scrollHeight > el.clientHeight);
+    };
+
+    requestAnimationFrame(computeOverflow);
+
+    const ro = new ResizeObserver(() => computeOverflow());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [allTags, tagsExpanded]);
 
   // Copy handler
   const handleCopy = useCallback((cmd: Command) => {
@@ -141,6 +176,26 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
       });
     }
   }, [vault]);
+
+  // Infinite scroll: load more when sentinel enters viewport.
+  useEffect(() => {
+    if (search.trim().length > 0) return;
+    const el = loadMoreRef.current;
+    if (!el) return;
+
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting) return;
+        void loadMoreCommands().catch(() => {
+          // ignore load-more errors (user can retry by scrolling)
+        });
+      },
+      { root: null, rootMargin: "400px" }
+    );
+
+    io.observe(el);
+    return () => io.disconnect();
+  }, [loadMoreCommands, search]);
 
   // Import handler
   const handleImport = useCallback((file: File) => {
@@ -159,7 +214,7 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
             setSearch("");
             setSearchResults(null);
             setSearchLoading(false);
-            setTagFilter(null);
+            setTagFilters([]);
             setActiveView("all");
           })
           .catch((err) => {
@@ -176,11 +231,21 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
     <div className="flex min-h-screen bg-background">
       <AppSidebar
         groups={vault.data.groups}
-        commands={vault.data.commands}
-        loading={vault.loading && vault.data.groups.length === 0 && vault.data.commands.length === 0}
+        stats={vault.stats}
+        loading={vault.loading && vault.data.groups.length === 0}
         importing={vault.importing}
         activeView={activeView}
-        onViewChange={(v) => { setActiveView(v); setSearch(""); setTagFilter(null); }}
+        onViewChange={(v) => {
+          setActiveView(v);
+          setSearch("");
+          setSearchResults(null);
+          setSearchLoading(false);
+          setTagFilters([]);
+          setTagsExpanded(false);
+          void setCommandsView(viewToOptions(v)).catch(() => {
+            // ignore
+          });
+        }}
         onNewGroup={() => { setEditGroup(null); setGroupModal(true); }}
         onExport={vault.exportData}
         onImport={handleImport}
@@ -197,7 +262,7 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
       {/* Main area */}
       <main className="flex-1 min-w-0">
         <div className="w-full max-w-7xl mx-auto px-3 md:px-6 py-6 md:py-8">
-          {vault.loading && vault.data.groups.length === 0 && vault.data.commands.length === 0 && (
+          {vault.loading && vault.data.groups.length === 0 && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
               <Loader2 className="w-4 h-4 animate-spin" />
               Loading...
@@ -290,22 +355,50 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
 
           {/* Tag filter */}
           {allTags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mb-5">
-              {tagFilter && (
-                <button onClick={() => setTagFilter(null)} className="px-2.5 py-1 text-[11px] rounded-full bg-accent-blue text-accent-blue-foreground font-medium">
-                  ✕ {tagFilter}
+            <div className="mb-5 mt-3">
+              {tagFilters.length > 0 && (
+                <div className="flex items-center justify-end mb-2">
+                  <button
+                    onClick={() => setTagFilters([])}
+                    className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Clear
+                  </button>
+                </div>
+              )}
+              <div
+                ref={tagsContainerRef}
+                className={`flex flex-wrap gap-1.5 ${tagsExpanded ? "" : "max-h-[56px] overflow-hidden"}`}
+              >
+                {allTags.map((tag) => {
+                  const selected = tagFilters.includes(tag);
+                  return (
+                    <button
+                      key={tag}
+                      onClick={() => toggleTagFilter(tag)}
+                      className={`px-2.5 py-1 text-[11px] rounded-full transition-colors ${selected
+                        ? "bg-accent-blue text-accent-blue-foreground font-medium"
+                        : "bg-secondary text-secondary-foreground hover:bg-surface-hover"}`}
+                    >
+                      {tag}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {tagsOverflow && (
+                <button
+                  onClick={() => setTagsExpanded((v) => !v)}
+                  className="mt-2 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {tagsExpanded ? "Show less" : "Show all"}
                 </button>
               )}
-              {!tagFilter && allTags.map((tag) => (
-                <button key={tag} onClick={() => setTagFilter(tag)} className="px-2.5 py-1 text-[11px] rounded-full bg-secondary text-secondary-foreground hover:bg-surface-hover transition-colors">
-                  {tag}
-                </button>
-              ))}
             </div>
           )}
 
           {/* Command cards */}
-          {(vault.loading && vault.data.commands.length === 0 && vault.data.groups.length === 0) || (search.trim().length > 0 && searchLoading && searchResults === null) ? (
+          {((search.trim().length === 0 && vault.commandsLoading && vault.data.commands.length === 0) || (search.trim().length > 0 && searchLoading && searchResults === null)) ? (
             <div className={`grid gap-3 ${layout === "horizontal" ? "sm:grid-cols-2" : "grid-cols-1"}`}>
               {[0, 1, 2, 3, 4].map((i) => (
                 <div key={i} className="border border-border rounded-lg bg-card p-4">
@@ -340,9 +433,28 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
                       toast.error(e?.message ?? "Failed to update favorite");
                     });
                   }}
-                  onTagClick={setTagFilter}
+                  onTagClick={toggleTagFilter}
                 />
               ))}
+
+              {/* Infinite scroll sentinel */}
+              {search.trim().length === 0 && (
+                <>
+                  {vault.commandsHasMore && (
+                    <div
+                      ref={loadMoreRef}
+                      className={`${layout === "horizontal" ? "sm:col-span-2" : ""} h-1 w-full`}
+                      aria-hidden="true"
+                    />
+                  )}
+                  {vault.commandsLoadingMore && (
+                    <div className={`${layout === "horizontal" ? "sm:col-span-2" : ""} flex items-center justify-center py-4 text-sm text-muted-foreground`}>
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      Loading more...
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -359,6 +471,16 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
           )}
         </div>
       </main>
+
+      <button
+        type="button"
+        onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+        className="fixed bottom-6 right-6 z-30 inline-flex items-center justify-center w-10 h-10 rounded-full border border-input bg-background text-muted-foreground hover:text-foreground hover:bg-surface-hover transition-colors"
+        aria-label="Scroll to top"
+        title="Scroll to top"
+      >
+        <ArrowUp className="w-4 h-4" />
+      </button>
 
       {/* Modals */}
       <GroupModal
@@ -415,7 +537,6 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
               // ignore
             });
           }
-          toast.success("Copied!");
           setVarModal(null);
         }}
         onCopyRaw={() => {
@@ -425,7 +546,6 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
               // ignore
             });
           }
-          toast.success("Copied!");
           setVarModal(null);
         }}
       />
