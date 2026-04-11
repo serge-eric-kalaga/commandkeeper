@@ -1,6 +1,17 @@
 import { useState, useEffect, KeyboardEvent, useMemo } from "react";
-import { Loader2, X } from "lucide-react";
+import { Check, ChevronsUpDown, Loader2, X } from "lucide-react";
 import { Command, Group } from "@/hooks/useCommandVault";
+import { Button } from "@/components/ui/button";
+import {
+  Command as CommandListRoot,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 interface Props {
   command?: Command | null;
@@ -24,6 +35,7 @@ export default function CommandModal({ command, groups, defaultGroupId, open, on
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [groupId, setGroupId] = useState<number>(0);
+  const [groupOpen, setGroupOpen] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -62,6 +74,8 @@ export default function CommandModal({ command, groups, defaultGroupId, open, on
   };
 
   if (!open) return null;
+
+  const selectedGroup = groups.find((g) => g.id === groupId) ?? null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -148,11 +162,47 @@ export default function CommandModal({ command, groups, defaultGroupId, open, on
           </div>
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Group</label>
-            <select value={String(groupId)} onChange={(e) => setGroupId(Number(e.target.value))} className="w-full px-3 py-2 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent-blue">
-              {groups.map((g) => (
-                <option key={g.id} value={g.id}>{g.icon} {g.name}</option>
-              ))}
-            </select>
+            <Popover open={groupOpen} onOpenChange={setGroupOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={groupOpen}
+                  className="w-full justify-between h-auto px-3 py-2 text-sm rounded-md border border-input bg-background text-foreground hover:bg-background"
+                >
+                  <span className={cn("truncate", !selectedGroup && "text-muted-foreground")}>
+                    {selectedGroup ? `${selectedGroup.icon} ${selectedGroup.name}` : "Select a group..."}
+                  </span>
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-[--radix-popover-trigger-width] p-0">
+                <CommandListRoot>
+                  <CommandInput placeholder="Search groups..." />
+                  <CommandList>
+                    <CommandEmpty>No group found.</CommandEmpty>
+                    <CommandGroup>
+                      {groups.map((g) => (
+                        <CommandItem
+                          key={g.id}
+                          value={`${g.name} ${g.icon}`}
+                          onSelect={() => {
+                            setGroupId(g.id);
+                            setGroupOpen(false);
+                          }}
+                          className="flex items-center gap-2"
+                        >
+                          <Check className={cn("h-4 w-4", groupId === g.id ? "opacity-100" : "opacity-0")} />
+                          <span className="text-base leading-none">{g.icon}</span>
+                          <span className="truncate">{g.name}</span>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </CommandListRoot>
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
 
