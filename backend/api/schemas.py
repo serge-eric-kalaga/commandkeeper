@@ -108,3 +108,12 @@ class CommandStatsResponse(BaseModel):
 
 class SearchResponse(BaseModel):
     items: list[CommandOut]
+
+
+class DashboardStatsResponse(BaseModel):
+    commands: int
+    groups: int
+    tags: int
+    copies: int
+    from_date: dt.date
+    to_date: dt.date

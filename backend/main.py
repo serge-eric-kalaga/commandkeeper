@@ -10,6 +10,7 @@ from api.routers import (
     groups_router,
     imports_router,
     search_router,
+    stats_router,
     tags_router,
 )
 from api.routers.auth import ensure_default_admin
@@ -48,6 +49,7 @@ app.include_router(commands_router)
 app.include_router(imports_router)
 app.include_router(search_router)
 app.include_router(tags_router)
+app.include_router(stats_router)
 
 
 @app.get("/health")

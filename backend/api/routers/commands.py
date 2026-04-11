@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from ..database import get_db
 from ..deps import require_ready_user
-from ..models import Command, Group, Tag
+from ..models import Command, CopyEvent, Group, Tag
 from ..schemas import (
     CommandCreate,
     CommandOut,
@@ -191,6 +191,8 @@ def update_command(
 
     data = payload.model_dump(exclude_unset=True)
 
+    prev_copy_count = cmd.copy_count
+
     if "group_id" in data and data["group_id"] is not None:
         group = db.get(Group, data["group_id"])
         if group is None:
@@ -207,6 +209,12 @@ def update_command(
 
     for key, value in data.items():
         setattr(cmd, key, value)
+
+    if "copy_count" in data and data.get("copy_count") is not None:
+        next_copy_count = int(cmd.copy_count or 0)
+        if next_copy_count > int(prev_copy_count or 0):
+            delta = next_copy_count - int(prev_copy_count or 0)
+            db.add(CopyEvent(command_id=cmd.id, delta=delta))
 
     db.add(cmd)
     db.commit()

@@ -4,6 +4,7 @@ from .groups import router as groups_router
 from .imports import router as imports_router
 from .search import router as search_router
 from .tags import router as tags_router
+from .stats import router as stats_router
 
 __all__ = [
     "auth_router",
@@ -12,4 +13,5 @@ __all__ = [
     "imports_router",
     "search_router",
     "tags_router",
+    "stats_router",
 ]

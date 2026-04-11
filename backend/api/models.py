@@ -118,3 +118,18 @@ class Command(Base):
     @property
     def tags(self) -> list[str]:
         return sorted({t.name for t in self.tag_entities})
+
+
+class CopyEvent(Base):
+    __tablename__ = "copy_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    command_id: Mapped[int] = mapped_column(
+        ForeignKey("commands.id", ondelete="CASCADE"), index=True
+    )
+    delta: Mapped[int] = mapped_column(Integer, default=1)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+
+    command: Mapped[Command] = relationship()

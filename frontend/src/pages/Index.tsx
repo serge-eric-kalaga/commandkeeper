@@ -111,6 +111,27 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
   });
   const [sortMode, setSortMode] = useState<"recent" | "mostCopied">("recent");
 
+  type DashboardStats = {
+    commands: number;
+    groups: number;
+    tags: number;
+    copies: number;
+    from_date: string;
+    to_date: string;
+  };
+
+  const todayIso = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const defaultFromIso = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return d.toISOString().slice(0, 10);
+  }, []);
+
+  const [dashFrom, setDashFrom] = useState(defaultFromIso);
+  const [dashTo, setDashTo] = useState(todayIso);
+  const [dashLoading, setDashLoading] = useState(false);
+  const [dashStats, setDashStats] = useState<DashboardStats | null>(null);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     localStorage.setItem("command-vault-layout", layout);
@@ -305,7 +326,46 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
     ? vault.data.groups.find((g) => g.id === Number(activeView.slice(6)))
     : null;
 
-  const viewTitle = activeView === "all" ? "All Commands" : activeView === "favorites" ? "Favorites" : currentGroup?.name ?? "Commands";
+  const viewTitle = activeView === "dashboard"
+    ? "Dashboard"
+    : activeView === "all"
+      ? "All Commands"
+      : activeView === "favorites"
+        ? "Favorites"
+        : currentGroup?.name ?? "Commands";
+
+  useEffect(() => {
+    if (activeView !== "dashboard") return;
+    let cancelled = false;
+    const controller = new AbortController();
+
+    setDashLoading(true);
+    void apiRequest<DashboardStats>("/stats/dashboard", {
+      token,
+      signal: controller.signal,
+      query: {
+        from_date: dashFrom,
+        to_date: dashTo,
+      },
+    })
+      .then((res) => {
+        if (cancelled) return;
+        setDashStats(res);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setDashStats(null);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setDashLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [activeView, dashFrom, dashTo, token]);
 
   const currentViewForExport = useMemo(() => {
     const parsed = parseAdvancedSearch(search);
@@ -486,102 +546,140 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
             </div>
 
             {/* Search & Actions */}
-            <div>
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  {searchLoading && (
-                    <Loader2 className="absolute right-9 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground animate-spin" />
-                  )}
-                  {search.trim().length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSearch("");
-                        setSearchResults(null);
-                        setSearchLoading(false);
-                        setTimeout(() => searchInputRef.current?.focus(), 0);
-                      }}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-surface-hover transition-colors"
-                      aria-label="Clear search"
-                      title="Clear search"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  )}
-                  <input
-                    id="vault-search"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search commands... (Ctrl+K)"
-                    title="Advanced search: tag:docker group:prod fav:true"
-                    ref={searchInputRef}
-                    className="w-full pl-9 pr-9 py-2 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent-blue placeholder:text-muted-foreground"
-                  />
+            {activeView !== "dashboard" ? (
+              <div>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    {searchLoading && (
+                      <Loader2 className="absolute right-9 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground animate-spin" />
+                    )}
+                    {search.trim().length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSearch("");
+                          setSearchResults(null);
+                          setSearchLoading(false);
+                          setTimeout(() => searchInputRef.current?.focus(), 0);
+                        }}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-surface-hover transition-colors"
+                        aria-label="Clear search"
+                        title="Clear search"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                    <input
+                      id="vault-search"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder="Search commands... (Ctrl+K)"
+                      title="Advanced search: tag:docker group:prod fav:true"
+                      ref={searchInputRef}
+                      className="w-full pl-9 pr-9 py-2 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent-blue placeholder:text-muted-foreground"
+                    />
+                  </div>
+
+                  <button
+                    onClick={() => setLayout((prev) => (prev === "vertical" ? "horizontal" : "vertical"))}
+                    disabled={vault.loading}
+                    title={layout === "vertical" ? "Switch to horizontal" : "Switch to vertical"}
+                    className="inline-flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-md border border-input bg-background text-muted-foreground hover:text-foreground hover:bg-surface-hover disabled:opacity-50 transition-colors"
+                  >
+                    {layout === "vertical" ? <LayoutGrid className="w-4 h-4" /> : <LayoutList className="w-4 h-4" />}
+                    <span className="hidden sm:inline">{layout === "vertical" ? "Horizontal" : "Vertical"}</span>
+                  </button>
+
+                  <button
+                    onClick={() => setSortMode((prev) => (prev === "recent" ? "mostCopied" : "recent"))}
+                    disabled={vault.loading}
+                    title={sortMode === "mostCopied" ? "Sort: most copied" : "Sort: recent"}
+                    className={`inline-flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-md border border-input bg-background transition-colors disabled:opacity-50 ${sortMode === "mostCopied" ? "text-foreground bg-surface-active" : "text-muted-foreground hover:text-foreground hover:bg-surface-hover"}`}
+                  >
+                    <ArrowDownUp className="w-4 h-4" />
+                    <span className="hidden sm:inline">{sortMode === "mostCopied" ? "Most copied" : "Recent"}</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setSelectionMode((v) => {
+                        const next = !v;
+                        if (!next) setSelectedIds(new Set());
+                        return next;
+                      });
+                    }}
+                    disabled={vault.loading}
+                    title={selectionMode ? "Exit selection" : "Select multiple commands"}
+                    className={`inline-flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-md border border-input bg-background transition-colors disabled:opacity-50 ${selectionMode ? "text-foreground bg-surface-active" : "text-muted-foreground hover:text-foreground hover:bg-surface-hover"}`}
+                  >
+                    <ListChecks className="w-4 h-4" />
+                    <span className="hidden sm:inline">{selectionMode ? "Selecting" : "Select"}</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      if (vault.data.groups.length === 0) {
+                        toast.info("Create a group first");
+                        setEditGroup(null);
+                        setGroupModal(true);
+                        return;
+                      }
+                      setEditCmd(null);
+                      setCmdModal(true);
+                    }}
+                    disabled={vault.loading}
+                    className="flex items-center gap-2 px-4 py-2 text-sm rounded-md bg-accent-blue text-accent-blue-foreground hover:opacity-90 disabled:opacity-50 transition-all font-medium whitespace-nowrap"
+                  >
+                    <Plus className="w-4 h-4" /> Add Command
+                  </button>
                 </div>
 
-                <button
-                  onClick={() => setLayout((prev) => (prev === "vertical" ? "horizontal" : "vertical"))}
-                  disabled={vault.loading}
-                  title={layout === "vertical" ? "Switch to horizontal" : "Switch to vertical"}
-                  className="inline-flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-md border border-input bg-background text-muted-foreground hover:text-foreground hover:bg-surface-hover disabled:opacity-50 transition-colors"
-                >
-                  {layout === "vertical" ? <LayoutGrid className="w-4 h-4" /> : <LayoutList className="w-4 h-4" />}
-                  <span className="hidden sm:inline">{layout === "vertical" ? "Horizontal" : "Vertical"}</span>
-                </button>
-
-                <button
-                  onClick={() => setSortMode((prev) => (prev === "recent" ? "mostCopied" : "recent"))}
-                  disabled={vault.loading}
-                  title={sortMode === "mostCopied" ? "Sort: most copied" : "Sort: recent"}
-                  className={`inline-flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-md border border-input bg-background transition-colors disabled:opacity-50 ${sortMode === "mostCopied" ? "text-foreground bg-surface-active" : "text-muted-foreground hover:text-foreground hover:bg-surface-hover"}`}
-                >
-                  <ArrowDownUp className="w-4 h-4" />
-                  <span className="hidden sm:inline">{sortMode === "mostCopied" ? "Most copied" : "Recent"}</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setSelectionMode((v) => {
-                      const next = !v;
-                      if (!next) setSelectedIds(new Set());
-                      return next;
-                    });
-                  }}
-                  disabled={vault.loading}
-                  title={selectionMode ? "Exit selection" : "Select multiple commands"}
-                  className={`inline-flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-md border border-input bg-background transition-colors disabled:opacity-50 ${selectionMode ? "text-foreground bg-surface-active" : "text-muted-foreground hover:text-foreground hover:bg-surface-hover"}`}
-                >
-                  <ListChecks className="w-4 h-4" />
-                  <span className="hidden sm:inline">{selectionMode ? "Selecting" : "Select"}</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    if (vault.data.groups.length === 0) {
-                      toast.info("Create a group first");
-                      setEditGroup(null);
-                      setGroupModal(true);
-                      return;
-                    }
-                    setEditCmd(null);
-                    setCmdModal(true);
-                  }}
-                  disabled={vault.loading}
-                  className="flex items-center gap-2 px-4 py-2 text-sm rounded-md bg-accent-blue text-accent-blue-foreground hover:opacity-90 disabled:opacity-50 transition-all font-medium whitespace-nowrap"
-                >
-                  <Plus className="w-4 h-4" /> Add Command
-                </button>
+                <div className="mt-1 text-[11px] text-muted-foreground pl-9">
+                  Tips: <span className="font-mono">tag:docker</span> <span className="font-mono">group:prod</span> <span className="font-mono">fav:true</span>
+                </div>
               </div>
+            ) : (
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-3">
+                <div className="flex-1">
+                  <div className="text-xs font-medium text-muted-foreground mb-2">Copies date range</div>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs text-muted-foreground">From</label>
+                      <input
+                        type="date"
+                        value={dashFrom}
+                        onChange={(e) => setDashFrom(e.target.value)}
+                        className="px-3 py-2 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent-blue"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs text-muted-foreground">To</label>
+                      <input
+                        type="date"
+                        value={dashTo}
+                        onChange={(e) => setDashTo(e.target.value)}
+                        className="px-3 py-2 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent-blue"
+                      />
+                    </div>
+                  </div>
+                </div>
 
-              <div className="mt-1 text-[11px] text-muted-foreground pl-9">
-                Tips: <span className="font-mono">tag:docker</span> <span className="font-mono">group:prod</span> <span className="font-mono">fav:true</span>
+                <div className="text-sm text-muted-foreground">
+                  {dashLoading ? (
+                    <span className="inline-flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Loading...</span>
+                  ) : dashStats ? (
+                    <span>Showing copies from <span className="font-medium text-foreground">{dashStats.from_date}</span> to <span className="font-medium text-foreground">{dashStats.to_date}</span></span>
+                  ) : (
+                    <span>Unable to load stats</span>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Tag filter */}
-          {allTags.length > 0 && (
+          {activeView !== "dashboard" && allTags.length > 0 && (
             <div className="mb-5 mt-3">
               {tagFilters.length > 0 && (
                 <div className="flex items-center justify-end mb-2">
@@ -625,7 +723,26 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
           )}
 
           {/* Command cards */}
-          {((search.trim().length === 0 && vault.commandsLoading && vault.data.commands.length === 0) || (search.trim().length > 0 && searchLoading && searchResults === null)) ? (
+          {activeView === "dashboard" ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-3">
+              <div className="border border-border rounded-lg bg-card p-4">
+                <div className="text-xs text-muted-foreground">Commands</div>
+                <div className="text-2xl font-semibold text-foreground mt-1">{dashStats?.commands ?? "—"}</div>
+              </div>
+              <div className="border border-border rounded-lg bg-card p-4">
+                <div className="text-xs text-muted-foreground">Groups</div>
+                <div className="text-2xl font-semibold text-foreground mt-1">{dashStats?.groups ?? "—"}</div>
+              </div>
+              <div className="border border-border rounded-lg bg-card p-4">
+                <div className="text-xs text-muted-foreground">Tags</div>
+                <div className="text-2xl font-semibold text-foreground mt-1">{dashStats?.tags ?? "—"}</div>
+              </div>
+              <div className="border border-border rounded-lg bg-card p-4">
+                <div className="text-xs text-muted-foreground">Copies (range)</div>
+                <div className="text-2xl font-semibold text-foreground mt-1">{dashStats?.copies ?? "—"}</div>
+              </div>
+            </div>
+          ) : ((search.trim().length === 0 && vault.commandsLoading && vault.data.commands.length === 0) || (search.trim().length > 0 && searchLoading && searchResults === null)) ? (
             <div className={`grid gap-3 ${layout === "horizontal" ? "sm:grid-cols-2" : "grid-cols-1"}`}>
               {[0, 1, 2, 3, 4].map((i) => (
                 <div key={i} className="border border-border rounded-lg bg-card p-4">

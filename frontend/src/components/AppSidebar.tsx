@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import {
-  Star, FolderOpen, Plus, Download, Upload, Sun, Moon, Menu, X, LogOut, Loader2,
+  Star, FolderOpen, Plus, Download, Upload, Sun, Moon, Menu, X, LogOut, Loader2, BarChart3,
 } from "lucide-react";
 import { Group, CommandStats } from "@/hooks/useCommandVault";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -64,6 +64,16 @@ export default function AppSidebar({
 
       {/* Nav */}
       <div className="flex-1 overflow-y-auto p-3 space-y-1">
+        <button
+          onClick={() => nav("dashboard")}
+          disabled={loading}
+          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors ${activeView === "dashboard" ? "bg-surface-active text-foreground font-medium" : "text-sidebar-fg hover:bg-surface-hover"
+            }`}
+        >
+          <BarChart3 className="w-4 h-4" />
+          <span>Dashboard</span>
+        </button>
+
         <button
           onClick={() => nav("all")}
           disabled={loading}
