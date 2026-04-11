@@ -3,6 +3,7 @@ from .commands import router as commands_router
 from .groups import router as groups_router
 from .imports import router as imports_router
 from .search import router as search_router
+from .tags import router as tags_router
 
 __all__ = [
     "auth_router",
@@ -10,4 +11,5 @@ __all__ = [
     "groups_router",
     "imports_router",
     "search_router",
+    "tags_router",
 ]

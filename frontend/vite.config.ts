@@ -31,6 +31,10 @@ export default defineConfig(({ mode }) => ({
         target: process.env.VITE_PROXY_TARGET ?? "http://localhost:2001",
         changeOrigin: true,
       },
+      "/tags": {
+        target: process.env.VITE_PROXY_TARGET ?? "http://localhost:2001",
+        changeOrigin: true,
+      },
       "/health": {
         target: process.env.VITE_PROXY_TARGET ?? "http://localhost:2001",
         changeOrigin: true,

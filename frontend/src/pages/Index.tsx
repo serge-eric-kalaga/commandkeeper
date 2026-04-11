@@ -8,6 +8,7 @@ import AppSidebar from "@/components/AppSidebar";
 import CommandCard from "@/components/CommandCard";
 import GroupModal from "@/components/GroupModal";
 import CommandModal from "@/components/CommandModal";
+import ExportModal from "@/components/ExportModal";
 import VariableModal from "@/components/VariableModal";
 import DeleteModal from "@/components/DeleteModal";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -126,6 +127,7 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
   const [editGroup, setEditGroup] = useState<Group | null>(null);
   const [cmdModal, setCmdModal] = useState(false);
   const [editCmd, setEditCmd] = useState<Command | null>(null);
+  const [exportModal, setExportModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ type: "command" | "group"; id: number; title: string } | null>(null);
   const [varModal, setVarModal] = useState<Command | null>(null);
 
@@ -257,6 +259,23 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
 
   const viewTitle = activeView === "all" ? "All Commands" : activeView === "favorites" ? "Favorites" : currentGroup?.name ?? "Commands";
 
+  const currentViewForExport = useMemo(() => {
+    const parsed = parseAdvancedSearch(search);
+    const base = viewToOptions(activeView);
+
+    let groupId = base.groupId;
+    if (parsed.groupName) {
+      const match = vault.data.groups.find((g) => g.name.toLowerCase() === parsed.groupName!.toLowerCase());
+      groupId = match ? match.id : -1;
+    }
+
+    const favoritesOnly = parsed.isFavorite ?? base.favoritesOnly;
+    const tags = Array.from(new Set([...(tagFilters ?? []), ...(parsed.tags ?? [])]));
+    const q = parsed.text.trim() ? parsed.text.trim() : undefined;
+
+    return { groupId, favoritesOnly, tags, q };
+  }, [activeView, search, tagFilters, viewToOptions, vault.data.groups]);
+
   // All tags for filter (from baseCommands so tags don't disappear when filtering)
   const allTags = useMemo(() => {
     const tags = new Set<string>();
@@ -364,7 +383,7 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
           });
         }}
         onNewGroup={() => { setEditGroup(null); setGroupModal(true); }}
-        onExport={vault.exportData}
+        onExport={() => setExportModal(true)}
         onImport={handleImport}
         onLogout={onLogout}
         dark={theme.dark}
@@ -710,6 +729,14 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
             throw e;
           }
         }}
+      />
+
+      <ExportModal
+        open={exportModal}
+        onClose={() => setExportModal(false)}
+        token={token}
+        groups={vault.data.groups}
+        currentView={currentViewForExport}
       />
     </div>
   );
