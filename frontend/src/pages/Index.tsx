@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { Search, Plus, FileCode, Loader2, LayoutGrid, LayoutList, ArrowDownUp, ArrowUp, X } from "lucide-react";
+import { Search, Plus, FileCode, Loader2, LayoutGrid, LayoutList, ArrowDownUp, ArrowUp, X, ListChecks } from "lucide-react";
 import { toast } from "sonner";
 import { useCommandVault, Command, Group, VaultData } from "@/hooks/useCommandVault";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/hooks/useAuth";
+import { apiRequest } from "@/lib/apiClient";
 import AppSidebar from "@/components/AppSidebar";
 import CommandCard from "@/components/CommandCard";
 import GroupModal from "@/components/GroupModal";
@@ -11,6 +12,7 @@ import CommandModal from "@/components/CommandModal";
 import ExportModal from "@/components/ExportModal";
 import VariableModal from "@/components/VariableModal";
 import DeleteModal from "@/components/DeleteModal";
+import BulkMoveModal from "@/components/BulkMoveModal";
 import { Skeleton } from "@/components/ui/skeleton";
 
 function parseAdvancedSearch(input: string): {
@@ -128,8 +130,17 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
   const [cmdModal, setCmdModal] = useState(false);
   const [editCmd, setEditCmd] = useState<Command | null>(null);
   const [exportModal, setExportModal] = useState(false);
+  const [exportSelection, setExportSelection] = useState<Command[] | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ type: "command" | "group"; id: number; title: string } | null>(null);
   const [varModal, setVarModal] = useState<Command | null>(null);
+
+  // Bulk selection mode
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
+  const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [bulkFavoriting, setBulkFavoriting] = useState(false);
 
   const viewToOptions = useCallback((view: string): { groupId?: number; favoritesOnly?: boolean } => {
     if (view === "favorites") return { favoritesOnly: true };
@@ -149,11 +160,31 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
         setCmdModal(false);
         setDeleteTarget(null);
         setVarModal(null);
+        setBulkMoveOpen(false);
+        setBulkDeleteOpen(false);
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, []);
+
+  // Keep selection sane: if view/search filters change, clear selection.
+  useEffect(() => {
+    if (!selectionMode) return;
+    setSelectedIds(new Set());
+  }, [activeView, search, tagFilters.join("|"), selectionMode]);
+
+  const bulkPatchCommands = useCallback(async (ids: number[], patch: Record<string, unknown>) => {
+    await Promise.all(
+      ids.map((id) => apiRequest(`/commands/${id}`, { method: "PATCH", token, json: patch }))
+    );
+  }, [token]);
+
+  const bulkDeleteCommands = useCallback(async (ids: number[]) => {
+    await Promise.all(
+      ids.map((id) => apiRequest(`/commands/${id}`, { method: "DELETE", token }))
+    );
+  }, [token]);
 
   // Base commands set for the current view/search (without tag filters).
   // This is used to keep the tag list stable when selecting multiple tags.
@@ -163,6 +194,23 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
     // vault.data.commands is already loaded for the current view.
     return cmds;
   }, [vault.data.commands, activeView, search, searchResults]);
+
+  const selectedCount = selectedIds.size;
+  const selectedCommands = useMemo(() => {
+    if (selectedIds.size === 0) return [];
+    const byId = new Map<number, Command>();
+    for (const c of baseCommands) byId.set(c.id, c);
+    return Array.from(selectedIds).map((id) => byId.get(id)).filter(Boolean) as Command[];
+  }, [baseCommands, selectedIds]);
+
+  const setSelected = useCallback((id: number, isSelected: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (isSelected) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }, []);
 
   // Filtered commands (applies tag filters + sorting)
   const filteredCommands = useMemo(() => {
@@ -383,7 +431,10 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
           });
         }}
         onNewGroup={() => { setEditGroup(null); setGroupModal(true); }}
-        onExport={() => setExportModal(true)}
+        onExport={() => {
+          setExportSelection(null);
+          setExportModal(true);
+        }}
         onImport={handleImport}
         onLogout={onLogout}
         dark={theme.dark}
@@ -487,6 +538,22 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
                 >
                   <ArrowDownUp className="w-4 h-4" />
                   <span className="hidden sm:inline">{sortMode === "mostCopied" ? "Most copied" : "Recent"}</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setSelectionMode((v) => {
+                      const next = !v;
+                      if (!next) setSelectedIds(new Set());
+                      return next;
+                    });
+                  }}
+                  disabled={vault.loading}
+                  title={selectionMode ? "Exit selection" : "Select multiple commands"}
+                  className={`inline-flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-md border border-input bg-background transition-colors disabled:opacity-50 ${selectionMode ? "text-foreground bg-surface-active" : "text-muted-foreground hover:text-foreground hover:bg-surface-hover"}`}
+                >
+                  <ListChecks className="w-4 h-4" />
+                  <span className="hidden sm:inline">{selectionMode ? "Selecting" : "Select"}</span>
                 </button>
 
                 <button
@@ -595,6 +662,9 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
                   }}
                   onTagClick={toggleTagFilter}
                   highlightTerms={search.trim().length > 0 ? highlightTerms : undefined}
+                  selectable={selectionMode}
+                  selected={selectedIds.has(cmd.id)}
+                  onSelectChange={(v) => setSelected(cmd.id, v)}
                 />
               ))}
 
@@ -664,6 +734,77 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
         }}
       />
 
+      {/* Bulk action bar */}
+      {selectionMode && selectedCount > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-[min(42rem,calc(100%-1.5rem))]">
+          <div className="bg-card border border-border rounded-xl shadow-lg px-3 py-2 flex items-center justify-between gap-3">
+            <div className="text-sm text-foreground">
+              <span className="font-medium">{selectedCount}</span> selected
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setBulkMoveOpen(true)}
+                disabled={vault.data.groups.length === 0 || bulkDeleting || bulkFavoriting}
+                className="px-3 py-1.5 text-sm rounded-md border border-input hover:bg-surface-hover transition-colors disabled:opacity-50"
+              >
+                Move
+              </button>
+              <button
+                onClick={() => {
+                  setExportSelection(selectedCommands);
+                  setExportModal(true);
+                }}
+                disabled={bulkDeleting || bulkFavoriting}
+                className="px-3 py-1.5 text-sm rounded-md border border-input hover:bg-surface-hover transition-colors disabled:opacity-50"
+              >
+                Export
+              </button>
+              <button
+                onClick={() => {
+                  if (bulkFavoriting) return;
+                  const ids = Array.from(selectedIds);
+                  const toastId = toast.loading("Updating favorites...");
+                  void (async () => {
+                    try {
+                      setBulkFavoriting(true);
+                      await bulkPatchCommands(ids, { is_favorite: true });
+                      await vault.reload();
+                      toast.success("Updated", { id: toastId });
+                      setSelectedIds(new Set());
+                    } catch (e: any) {
+                      toast.error(e?.message ?? "Failed", { id: toastId });
+                    } finally {
+                      setBulkFavoriting(false);
+                    }
+                  })();
+                }}
+                disabled={bulkDeleting}
+                className="px-3 py-1.5 text-sm rounded-md border border-input hover:bg-surface-hover transition-colors disabled:opacity-50"
+              >
+                Favorite
+              </button>
+              <button
+                onClick={() => setBulkDeleteOpen(true)}
+                className="px-3 py-1.5 text-sm rounded-md bg-destructive text-destructive-foreground hover:opacity-90 transition-colors disabled:opacity-60"
+                disabled={bulkFavoriting}
+              >
+                Delete
+              </button>
+              <button
+                onClick={() => {
+                  setSelectedIds(new Set());
+                  setSelectionMode(false);
+                }}
+                disabled={bulkDeleting || bulkFavoriting}
+                className="px-3 py-1.5 text-sm rounded-md hover:bg-surface-hover text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <CommandModal
         open={cmdModal}
         command={editCmd}
@@ -731,12 +872,56 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
         }}
       />
 
+      <DeleteModal
+        open={bulkDeleteOpen}
+        title={`${selectedCount} command${selectedCount === 1 ? "" : "s"}`}
+        onClose={() => setBulkDeleteOpen(false)}
+        onConfirm={async () => {
+          if (bulkDeleting) return;
+          const ids = Array.from(selectedIds);
+          const toastId = toast.loading("Deleting...");
+          try {
+            setBulkDeleting(true);
+            await bulkDeleteCommands(ids);
+            await vault.reload();
+            toast.success("Deleted", { id: toastId });
+            setSelectedIds(new Set());
+          } catch (e: any) {
+            toast.error(e?.message ?? "Delete failed", { id: toastId });
+            throw e;
+          } finally {
+            setBulkDeleting(false);
+          }
+        }}
+      />
+
       <ExportModal
         open={exportModal}
-        onClose={() => setExportModal(false)}
+        onClose={() => { setExportModal(false); setExportSelection(null); }}
         token={token}
         groups={vault.data.groups}
         currentView={currentViewForExport}
+        selectionCommands={exportSelection ?? undefined}
+      />
+
+      <BulkMoveModal
+        open={bulkMoveOpen}
+        groups={vault.data.groups}
+        count={selectedCount}
+        onClose={() => setBulkMoveOpen(false)}
+        onConfirm={async (groupId) => {
+          const ids = Array.from(selectedIds);
+          const toastId = toast.loading("Moving...");
+          try {
+            await bulkPatchCommands(ids, { group_id: groupId });
+            await vault.reload();
+            toast.success("Moved", { id: toastId });
+            setSelectedIds(new Set());
+          } catch (e: any) {
+            toast.error(e?.message ?? "Move failed", { id: toastId });
+            throw e;
+          }
+        }}
       />
     </div>
   );

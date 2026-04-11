@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Star, Copy, Check, Pencil, Trash2, ChevronDown, ChevronUp } from "lucide-react";
 import { Command } from "@/hooks/useCommandVault";
+import { Checkbox } from "@/components/ui/checkbox";
 
 function escapeRegex(s: string) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -87,9 +88,25 @@ interface Props {
   onToggleFavorite: (id: number) => void;
   onTagClick: (tag: string) => void;
   highlightTerms?: string[];
+
+  selectable?: boolean;
+  selected?: boolean;
+  onSelectChange?: (selected: boolean) => void;
 }
 
-export default function CommandCard({ cmd, groupColor, onCopy, onEdit, onDelete, onToggleFavorite, onTagClick, highlightTerms }: Props) {
+export default function CommandCard({
+  cmd,
+  groupColor,
+  onCopy,
+  onEdit,
+  onDelete,
+  onToggleFavorite,
+  onTagClick,
+  highlightTerms,
+  selectable,
+  selected,
+  onSelectChange,
+}: Props) {
   const [expanded, setExpanded] = useState(false);
   const [justCopied, setJustCopied] = useState(false);
   const copiedTimeoutRef = useRef<number | null>(null);
@@ -105,7 +122,17 @@ export default function CommandCard({ cmd, groupColor, onCopy, onEdit, onDelete,
     <div className="border border-border rounded-lg bg-card p-4 hover:border-muted-foreground/30 transition-colors animate-fade-in border-l-[3px]" style={{ borderLeftColor: groupColor || 'var(--border)' }}>
       {/* Title row */}
       <div className="flex items-start justify-between gap-2 mb-2">
-        <h3 className="font-medium text-sm text-card-foreground leading-snug">{highlightText(cmd.title, highlightTerms)}</h3>
+        <div className="flex items-start gap-2 min-w-0">
+          {selectable && (
+            <Checkbox
+              checked={!!selected}
+              onCheckedChange={(v) => onSelectChange?.(Boolean(v))}
+              aria-label={selected ? "Deselect command" : "Select command"}
+              className="mt-0.5"
+            />
+          )}
+          <h3 className="font-medium text-sm text-card-foreground leading-snug truncate">{highlightText(cmd.title, highlightTerms)}</h3>
+        </div>
         <button onClick={() => onToggleFavorite(cmd.id)} className="shrink-0 p-0.5">
           <Star className={`w-4 h-4 transition-colors ${cmd.isFavorite ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground hover:text-yellow-400"}`} />
         </button>

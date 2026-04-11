@@ -480,8 +480,11 @@ export default function ExportModal(props: {
     token: string;
     groups: Group[];
     currentView: { groupId?: number; favoritesOnly?: boolean; tags: string[]; q?: string };
+    selectionCommands?: Command[];
 }) {
-    const { open, onClose, token, groups, currentView } = props;
+    const { open, onClose, token, groups, currentView, selectionCommands } = props;
+
+    const selectionMode = (selectionCommands?.length ?? 0) > 0;
 
     const [format, setFormat] = useState<ExportFormat>("json");
     const [filters, setFilters] = useState<ExportFilters>({
@@ -511,7 +514,7 @@ export default function ExportModal(props: {
         if (!open) return;
         setFormat("json");
         setFilters({
-            useCurrentView: true,
+            useCurrentView: !selectionMode,
             favoritesOnly: currentView.favoritesOnly ?? false,
             groupIds: currentView.groupId != null ? [currentView.groupId] : [],
             tags: currentView.tags ?? [],
@@ -519,16 +522,17 @@ export default function ExportModal(props: {
         setFields({ description: true, tags: true, variables: true, favorite: true, copyCount: true });
         setTagSearch("");
         setGroupSearch("");
-    }, [open, currentView.favoritesOnly, currentView.groupId, currentView.tags]);
+    }, [open, currentView.favoritesOnly, currentView.groupId, currentView.tags, selectionMode]);
 
     useEffect(() => {
         if (!open) return;
+        if (selectionMode) return;
         setLoadingTags(true);
         apiRequest<string[]>("/tags", { token })
             .then((tags) => setTagList(tags))
             .catch(() => setTagList([]))
             .finally(() => setLoadingTags(false));
-    }, [open, token]);
+    }, [open, token, selectionMode]);
 
     const effective = useMemo(() => {
         if (filters.useCurrentView) {
@@ -569,13 +573,19 @@ export default function ExportModal(props: {
         if (exporting) return;
         setExporting(true);
         try {
-            const payload = await buildExportPayload(token, groups, {
-                useCurrentView: filters.useCurrentView,
-                favoritesOnly: effective.favoritesOnly,
-                groupIds: effective.groupIds,
-                tags: effective.tags,
-                q: effective.q,
-            });
+            const payload = selectionMode
+                ? (() => {
+                    const cmds = selectionCommands ?? [];
+                    const includedGroupIds = new Set(cmds.map((c) => c.groupId));
+                    return { groups: groups.filter((g) => includedGroupIds.has(g.id)), commands: cmds };
+                })()
+                : await buildExportPayload(token, groups, {
+                    useCurrentView: filters.useCurrentView,
+                    favoritesOnly: effective.favoritesOnly,
+                    groupIds: effective.groupIds,
+                    tags: effective.tags,
+                    q: effective.q,
+                });
 
             const date = new Date().toISOString().slice(0, 10);
 
@@ -636,125 +646,133 @@ export default function ExportModal(props: {
                     <div className="space-y-4">
                         <div>
                             <div className="text-xs font-medium text-muted-foreground mb-2">Scope</div>
-                            <label className="flex items-center gap-2 text-sm">
-                                <Checkbox
-                                    checked={filters.useCurrentView}
-                                    onCheckedChange={(v) => setFilters((p) => ({ ...p, useCurrentView: Boolean(v) }))}
-                                />
-                                Use current view (recommended)
-                            </label>
-
-                            {!filters.useCurrentView && (
-                                <div className="mt-3 space-y-3">
+                            {selectionMode ? (
+                                <div className="text-sm text-muted-foreground">
+                                    Exporting <span className="font-medium text-foreground">{selectionCommands?.length ?? 0}</span> selected command{(selectionCommands?.length ?? 0) === 1 ? "" : "s"}.
+                                </div>
+                            ) : (
+                                <>
                                     <label className="flex items-center gap-2 text-sm">
                                         <Checkbox
-                                            checked={filters.favoritesOnly}
-                                            onCheckedChange={(v) => setFilters((p) => ({ ...p, favoritesOnly: Boolean(v) }))}
+                                            checked={filters.useCurrentView}
+                                            onCheckedChange={(v) => setFilters((p) => ({ ...p, useCurrentView: Boolean(v) }))}
                                         />
-                                        Favorites only
+                                        Use current view (recommended)
                                     </label>
 
-                                    <div>
-                                        <div className="flex items-center justify-between mb-1.5">
-                                            <div className="text-xs font-medium text-muted-foreground">Groups</div>
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="sm"
-                                                className="h-7 px-2 text-xs"
-                                                onClick={() => setFilters((p) => ({ ...p, groupIds: groups.map((g) => g.id) }))}
-                                            >
-                                                Select all
-                                            </Button>
-                                        </div>
-                                        <input
-                                            value={groupSearch}
-                                            onChange={(e) => setGroupSearch(e.target.value)}
-                                            placeholder="Search groups..."
-                                            className="w-full px-3 py-2 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent-blue"
-                                        />
-                                        <div className="mt-2 border border-border rounded-md">
-                                            <ScrollArea className="h-40">
-                                                <div className="p-2 space-y-2">
-                                                    {filteredGroups.map((g) => (
-                                                        <label key={g.id} className="flex items-center gap-2 text-sm">
-                                                            <Checkbox
-                                                                checked={filters.groupIds.includes(g.id)}
-                                                                onCheckedChange={() => setFilters((p) => ({ ...p, groupIds: toggleNum(p.groupIds, g.id) }))}
-                                                            />
-                                                            <span className="text-base leading-none">{g.icon}</span>
-                                                            <span className="truncate">{g.name}</span>
-                                                        </label>
-                                                    ))}
-                                                    {filteredGroups.length === 0 && (
-                                                        <div className="text-sm text-muted-foreground py-2">No groups</div>
-                                                    )}
-                                                </div>
-                                            </ScrollArea>
-                                        </div>
-                                        <div className="mt-1 text-[11px] text-muted-foreground">
-                                            Leave empty to export all groups.
-                                        </div>
-                                    </div>
+                                    {!filters.useCurrentView && (
+                                        <div className="mt-3 space-y-3">
+                                            <label className="flex items-center gap-2 text-sm">
+                                                <Checkbox
+                                                    checked={filters.favoritesOnly}
+                                                    onCheckedChange={(v) => setFilters((p) => ({ ...p, favoritesOnly: Boolean(v) }))}
+                                                />
+                                                Favorites only
+                                            </label>
 
-                                    <div>
-                                        <div className="flex items-center justify-between mb-1.5">
-                                            <div className="text-xs font-medium text-muted-foreground">Tags</div>
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="sm"
-                                                className="h-7 px-2 text-xs"
-                                                disabled={loadingTags}
-                                                onClick={() => setFilters((p) => ({ ...p, tags: [...tagList] }))}
-                                            >
-                                                Select all
-                                            </Button>
-                                        </div>
-                                        <input
-                                            value={tagSearch}
-                                            onChange={(e) => setTagSearch(e.target.value)}
-                                            placeholder="Search tags..."
-                                            className="w-full px-3 py-2 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent-blue"
-                                        />
-                                        <div className="mt-2 border border-border rounded-md">
-                                            <ScrollArea className="h-40">
-                                                <div className="p-2 space-y-2">
-                                                    {loadingTags ? (
-                                                        <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
-                                                            <Loader2 className="w-4 h-4 animate-spin" />
-                                                            Loading tags...
-                                                        </div>
-                                                    ) : (
-                                                        <>
-                                                            {filteredTags.map((t) => (
-                                                                <label key={t} className="flex items-center gap-2 text-sm">
+                                            <div>
+                                                <div className="flex items-center justify-between mb-1.5">
+                                                    <div className="text-xs font-medium text-muted-foreground">Groups</div>
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-7 px-2 text-xs"
+                                                        onClick={() => setFilters((p) => ({ ...p, groupIds: groups.map((g) => g.id) }))}
+                                                    >
+                                                        Select all
+                                                    </Button>
+                                                </div>
+                                                <input
+                                                    value={groupSearch}
+                                                    onChange={(e) => setGroupSearch(e.target.value)}
+                                                    placeholder="Search groups..."
+                                                    className="w-full px-3 py-2 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent-blue"
+                                                />
+                                                <div className="mt-2 border border-border rounded-md">
+                                                    <ScrollArea className="h-40">
+                                                        <div className="p-2 space-y-2">
+                                                            {filteredGroups.map((g) => (
+                                                                <label key={g.id} className="flex items-center gap-2 text-sm">
                                                                     <Checkbox
-                                                                        checked={filters.tags.includes(t)}
-                                                                        onCheckedChange={() => setFilters((p) => ({ ...p, tags: toggle(p.tags, t) }))}
+                                                                        checked={filters.groupIds.includes(g.id)}
+                                                                        onCheckedChange={() => setFilters((p) => ({ ...p, groupIds: toggleNum(p.groupIds, g.id) }))}
                                                                     />
-                                                                    <span className="truncate">{t}</span>
+                                                                    <span className="text-base leading-none">{g.icon}</span>
+                                                                    <span className="truncate">{g.name}</span>
                                                                 </label>
                                                             ))}
-                                                            {filteredTags.length === 0 && (
-                                                                <div className="text-sm text-muted-foreground py-2">No tags</div>
+                                                            {filteredGroups.length === 0 && (
+                                                                <div className="text-sm text-muted-foreground py-2">No groups</div>
                                                             )}
-                                                        </>
-                                                    )}
+                                                        </div>
+                                                    </ScrollArea>
                                                 </div>
-                                            </ScrollArea>
-                                        </div>
-                                        <div className="mt-1 text-[11px] text-muted-foreground">
-                                            Leave empty to export all tags.
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
+                                                <div className="mt-1 text-[11px] text-muted-foreground">
+                                                    Leave empty to export all groups.
+                                                </div>
+                                            </div>
 
-                            {filters.useCurrentView && (
-                                <div className="mt-2 text-[11px] text-muted-foreground">
-                                    Uses: view filters + selected tags + search.
-                                </div>
+                                            <div>
+                                                <div className="flex items-center justify-between mb-1.5">
+                                                    <div className="text-xs font-medium text-muted-foreground">Tags</div>
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-7 px-2 text-xs"
+                                                        disabled={loadingTags}
+                                                        onClick={() => setFilters((p) => ({ ...p, tags: [...tagList] }))}
+                                                    >
+                                                        Select all
+                                                    </Button>
+                                                </div>
+                                                <input
+                                                    value={tagSearch}
+                                                    onChange={(e) => setTagSearch(e.target.value)}
+                                                    placeholder="Search tags..."
+                                                    className="w-full px-3 py-2 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent-blue"
+                                                />
+                                                <div className="mt-2 border border-border rounded-md">
+                                                    <ScrollArea className="h-40">
+                                                        <div className="p-2 space-y-2">
+                                                            {loadingTags ? (
+                                                                <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                                                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                                                    Loading tags...
+                                                                </div>
+                                                            ) : (
+                                                                <>
+                                                                    {filteredTags.map((t) => (
+                                                                        <label key={t} className="flex items-center gap-2 text-sm">
+                                                                            <Checkbox
+                                                                                checked={filters.tags.includes(t)}
+                                                                                onCheckedChange={() => setFilters((p) => ({ ...p, tags: toggle(p.tags, t) }))}
+                                                                            />
+                                                                            <span className="truncate">{t}</span>
+                                                                        </label>
+                                                                    ))}
+                                                                    {filteredTags.length === 0 && (
+                                                                        <div className="text-sm text-muted-foreground py-2">No tags</div>
+                                                                    )}
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    </ScrollArea>
+                                                </div>
+                                                <div className="mt-1 text-[11px] text-muted-foreground">
+                                                    Leave empty to export all tags.
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {filters.useCurrentView && (
+                                        <div className="mt-2 text-[11px] text-muted-foreground">
+                                            Uses: view filters + selected tags + search.
+                                        </div>
+                                    )}
+                                </>
                             )}
                         </div>
                     </div>
