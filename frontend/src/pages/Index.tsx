@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { Search, Plus, FileCode, Loader2, LayoutGrid, LayoutList, ArrowDownUp, ArrowUp } from "lucide-react";
+import { Search, Plus, FileCode, Loader2, LayoutGrid, LayoutList, ArrowDownUp, ArrowUp, X } from "lucide-react";
 import { toast } from "sonner";
 import { useCommandVault, Command, Group, VaultData } from "@/hooks/useCommandVault";
 import { useTheme } from "@/hooks/useTheme";
@@ -12,9 +12,83 @@ import VariableModal from "@/components/VariableModal";
 import DeleteModal from "@/components/DeleteModal";
 import { Skeleton } from "@/components/ui/skeleton";
 
+function parseAdvancedSearch(input: string): {
+  text: string;
+  tags: string[];
+  groupName?: string;
+  isFavorite?: boolean;
+} {
+  const parts = input.trim().split(/\s+/).filter(Boolean);
+  const tags: string[] = [];
+  let groupName: string | undefined;
+  let isFavorite: boolean | undefined;
+  const rest: string[] = [];
+
+  for (const p of parts) {
+    const idx = p.indexOf(":");
+    if (idx <= 0) {
+      rest.push(p);
+      continue;
+    }
+
+    const key = p.slice(0, idx).toLowerCase();
+    const rawValue = p.slice(idx + 1);
+    if (!rawValue) continue;
+
+    if (key === "tag") {
+      const normalized = rawValue
+        .split(",")
+        .map((t) => t.trim().toLowerCase())
+        .filter(Boolean);
+      tags.push(...normalized);
+      continue;
+    }
+
+    if (key === "group") {
+      groupName = rawValue.trim();
+      continue;
+    }
+
+    if (key === "fav" || key === "favorite") {
+      const v = rawValue.trim().toLowerCase();
+      if (v === "true" || v === "1" || v === "yes") isFavorite = true;
+      if (v === "false" || v === "0" || v === "no") isFavorite = false;
+      continue;
+    }
+
+    rest.push(p);
+  }
+
+  // de-dup tags
+  const uniqTags = Array.from(new Set(tags));
+  return { text: rest.join(" "), tags: uniqTags, groupName, isFavorite };
+}
+
+function extractHighlightTerms(input: string): string[] {
+  const parts = input
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .map((t) => t.replace(/^[\s.,;:()\[\]{}<>\"']+|[\s.,;:()\[\]{}<>\"']+$/g, ""))
+    .filter(Boolean);
+
+  const uniq: string[] = [];
+  const seen = new Set<string>();
+  for (const p of parts) {
+    if (p.length < 2) continue;
+    if (seen.has(p)) continue;
+    seen.add(p);
+    uniq.push(p);
+    if (uniq.length >= 10) break;
+  }
+  return uniq;
+}
+
 function VaultPage({ token, onLogout }: { token: string; onLogout: () => void }) {
   const vault = useCommandVault(token);
   const theme = useTheme();
+
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   const loadMoreCommands = vault.loadMoreCommands;
   const setCommandsView = vault.setCommandsView;
@@ -26,11 +100,26 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
   const [tagsOverflow, setTagsOverflow] = useState(false);
   const tagsContainerRef = useRef<HTMLDivElement | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
-  const [layout, setLayout] = useState<"vertical" | "horizontal">("vertical");
+  const [layout, setLayout] = useState<"vertical" | "horizontal">(() => {
+    if (typeof window === "undefined") return "vertical";
+    const stored = localStorage.getItem("command-vault-layout");
+    if (stored === "horizontal" || stored === "vertical") return stored;
+    return "vertical";
+  });
   const [sortMode, setSortMode] = useState<"recent" | "mostCopied">("recent");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem("command-vault-layout", layout);
+  }, [layout]);
 
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchResults, setSearchResults] = useState<Command[] | null>(null);
+
+  const highlightTerms = useMemo(() => {
+    const parsed = parseAdvancedSearch(search);
+    return extractHighlightTerms(parsed.text);
+  }, [search]);
 
   // Modals
   const [groupModal, setGroupModal] = useState(false);
@@ -105,33 +194,61 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
     }
 
     let cancelled = false;
-    const groupId = activeView.startsWith("group:") ? Number(activeView.slice(6)) : undefined;
+    const parsed = parseAdvancedSearch(q);
+
+    // If the user is still typing an operator (e.g. "tag:"), avoid spamming the API.
+    if (!parsed.text && parsed.tags.length === 0 && parsed.isFavorite === undefined && !parsed.groupName) {
+      setSearchResults(null);
+      setSearchLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+
+    const defaultGroupId = activeView.startsWith("group:") ? Number(activeView.slice(6)) : undefined;
+    const defaultFavorite = activeView === "favorites" ? true : undefined;
+
+    let groupId = defaultGroupId;
+    if (parsed.groupName) {
+      const match = vault.data.groups.find((g) => g.name.toLowerCase() === parsed.groupName!.toLowerCase());
+      if (!match) {
+        setSearchLoading(false);
+        setSearchResults([]);
+        return;
+      }
+      groupId = match.id;
+    }
+
+    const isFavorite = parsed.isFavorite ?? defaultFavorite;
+    const tags = parsed.tags;
 
     setSearchLoading(true);
     setSearchResults(null);
 
     const t = window.setTimeout(() => {
       void vault
-        .searchCommands(q, { groupId, limit: 200 })
+        .searchCommands(parsed.text, { groupId, limit: 200, tags, isFavorite, signal: controller.signal })
         .then((items) => {
           if (cancelled) return;
           setSearchResults(items);
         })
-        .catch(() => {
+        .catch((err) => {
           if (cancelled) return;
+          if ((err as any)?.name === "AbortError") return;
           setSearchResults([]);
         })
         .finally(() => {
           if (cancelled) return;
           setSearchLoading(false);
         });
-    }, 250);
+    }, 500);
 
     return () => {
       cancelled = true;
+      controller.abort();
       window.clearTimeout(t);
     };
-  }, [search, activeView, vault.searchCommands]);
+  }, [search, activeView, vault.searchCommands, vault.data.groups]);
 
   // Current group
   const currentGroup = activeView.startsWith("group:")
@@ -299,57 +416,81 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
             </div>
 
             {/* Search & Actions */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                {searchLoading && (
-                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground animate-spin" />
-                )}
-                <input
-                  id="vault-search"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search commands... (Ctrl+K)"
-                  className="w-full pl-9 pr-9 py-2 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent-blue placeholder:text-muted-foreground"
-                />
+            <div>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  {searchLoading && (
+                    <Loader2 className="absolute right-9 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground animate-spin" />
+                  )}
+                  {search.trim().length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearch("");
+                        setSearchResults(null);
+                        setSearchLoading(false);
+                        setTimeout(() => searchInputRef.current?.focus(), 0);
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-surface-hover transition-colors"
+                      aria-label="Clear search"
+                      title="Clear search"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                  <input
+                    id="vault-search"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search commands... (Ctrl+K)"
+                    title="Advanced search: tag:docker group:prod fav:true"
+                    ref={searchInputRef}
+                    className="w-full pl-9 pr-9 py-2 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent-blue placeholder:text-muted-foreground"
+                  />
+                </div>
+
+                <button
+                  onClick={() => setLayout((prev) => (prev === "vertical" ? "horizontal" : "vertical"))}
+                  disabled={vault.loading}
+                  title={layout === "vertical" ? "Switch to horizontal" : "Switch to vertical"}
+                  className="inline-flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-md border border-input bg-background text-muted-foreground hover:text-foreground hover:bg-surface-hover disabled:opacity-50 transition-colors"
+                >
+                  {layout === "vertical" ? <LayoutGrid className="w-4 h-4" /> : <LayoutList className="w-4 h-4" />}
+                  <span className="hidden sm:inline">{layout === "vertical" ? "Horizontal" : "Vertical"}</span>
+                </button>
+
+                <button
+                  onClick={() => setSortMode((prev) => (prev === "recent" ? "mostCopied" : "recent"))}
+                  disabled={vault.loading}
+                  title={sortMode === "mostCopied" ? "Sort: most copied" : "Sort: recent"}
+                  className={`inline-flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-md border border-input bg-background transition-colors disabled:opacity-50 ${sortMode === "mostCopied" ? "text-foreground bg-surface-active" : "text-muted-foreground hover:text-foreground hover:bg-surface-hover"}`}
+                >
+                  <ArrowDownUp className="w-4 h-4" />
+                  <span className="hidden sm:inline">{sortMode === "mostCopied" ? "Most copied" : "Recent"}</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    if (vault.data.groups.length === 0) {
+                      toast.info("Create a group first");
+                      setEditGroup(null);
+                      setGroupModal(true);
+                      return;
+                    }
+                    setEditCmd(null);
+                    setCmdModal(true);
+                  }}
+                  disabled={vault.loading}
+                  className="flex items-center gap-2 px-4 py-2 text-sm rounded-md bg-accent-blue text-accent-blue-foreground hover:opacity-90 disabled:opacity-50 transition-all font-medium whitespace-nowrap"
+                >
+                  <Plus className="w-4 h-4" /> Add Command
+                </button>
               </div>
 
-              <button
-                onClick={() => setLayout((prev) => (prev === "vertical" ? "horizontal" : "vertical"))}
-                disabled={vault.loading}
-                title={layout === "vertical" ? "Switch to horizontal" : "Switch to vertical"}
-                className="inline-flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-md border border-input bg-background text-muted-foreground hover:text-foreground hover:bg-surface-hover disabled:opacity-50 transition-colors"
-              >
-                {layout === "vertical" ? <LayoutGrid className="w-4 h-4" /> : <LayoutList className="w-4 h-4" />}
-                <span className="hidden sm:inline">{layout === "vertical" ? "Horizontal" : "Vertical"}</span>
-              </button>
-
-              <button
-                onClick={() => setSortMode((prev) => (prev === "recent" ? "mostCopied" : "recent"))}
-                disabled={vault.loading}
-                title={sortMode === "mostCopied" ? "Sort: most copied" : "Sort: recent"}
-                className={`inline-flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-md border border-input bg-background transition-colors disabled:opacity-50 ${sortMode === "mostCopied" ? "text-foreground bg-surface-active" : "text-muted-foreground hover:text-foreground hover:bg-surface-hover"}`}
-              >
-                <ArrowDownUp className="w-4 h-4" />
-                <span className="hidden sm:inline">{sortMode === "mostCopied" ? "Most copied" : "Recent"}</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  if (vault.data.groups.length === 0) {
-                    toast.info("Create a group first");
-                    setEditGroup(null);
-                    setGroupModal(true);
-                    return;
-                  }
-                  setEditCmd(null);
-                  setCmdModal(true);
-                }}
-                disabled={vault.loading}
-                className="flex items-center gap-2 px-4 py-2 text-sm rounded-md bg-accent-blue text-accent-blue-foreground hover:opacity-90 disabled:opacity-50 transition-all font-medium whitespace-nowrap"
-              >
-                <Plus className="w-4 h-4" /> Add Command
-              </button>
+              <div className="mt-1 text-[11px] text-muted-foreground pl-9">
+                Tips: <span className="font-mono">tag:docker</span> <span className="font-mono">group:prod</span> <span className="font-mono">fav:true</span>
+              </div>
             </div>
           </div>
 
@@ -434,6 +575,7 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
                     });
                   }}
                   onTagClick={toggleTagFilter}
+                  highlightTerms={search.trim().length > 0 ? highlightTerms : undefined}
                 />
               ))}
 

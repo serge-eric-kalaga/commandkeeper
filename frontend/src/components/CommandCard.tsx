@@ -2,7 +2,31 @@ import { useEffect, useRef, useState } from "react";
 import { Star, Copy, Check, Pencil, Trash2, ChevronDown, ChevronUp } from "lucide-react";
 import { Command } from "@/hooks/useCommandVault";
 
-function renderBash(commandText: string) {
+function escapeRegex(s: string) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function highlightText(text: string, terms?: string[]) {
+  const cleaned = (terms ?? []).map((t) => t.trim()).filter(Boolean);
+  if (cleaned.length === 0) return text;
+
+  const re = new RegExp(`(${cleaned.map(escapeRegex).join("|")})`, "ig");
+  const parts = text.split(re);
+  if (parts.length <= 1) return text;
+
+  return parts.map((part, idx) => {
+    if (idx % 2 === 1) {
+      return (
+        <span key={idx} className="rounded-sm bg-accent-blue/20 px-0.5">
+          {part}
+        </span>
+      );
+    }
+    return <span key={idx}>{part}</span>;
+  });
+}
+
+function renderBash(commandText: string, highlightTerms?: string[]) {
   const re = /(\s+|\"(?:[^\"\\]|\\.)*\"|'[^']*'|\{\{\w+\}\}|>>|\|\||&&|[|;<>]|--?[a-zA-Z0-9][a-zA-Z0-9_-]*|[^\s]+)/g;
   const tokens = commandText.match(re) ?? [commandText];
 
@@ -42,8 +66,12 @@ function renderBash(commandText: string) {
       className = "";
     }
 
+    const lower = tok.toLowerCase();
+    const shouldHighlight = (highlightTerms ?? []).some((t) => t && lower.includes(t.toLowerCase()));
+    const hlClass = shouldHighlight ? "bg-accent-blue/20 rounded-sm" : "";
+
     return (
-      <span key={i} className={className}>
+      <span key={i} className={[className, hlClass].filter(Boolean).join(" ")}>
         {tok}
       </span>
     );
@@ -58,9 +86,10 @@ interface Props {
   onDelete: (cmd: Command) => void;
   onToggleFavorite: (id: number) => void;
   onTagClick: (tag: string) => void;
+  highlightTerms?: string[];
 }
 
-export default function CommandCard({ cmd, groupColor, onCopy, onEdit, onDelete, onToggleFavorite, onTagClick }: Props) {
+export default function CommandCard({ cmd, groupColor, onCopy, onEdit, onDelete, onToggleFavorite, onTagClick, highlightTerms }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [justCopied, setJustCopied] = useState(false);
   const copiedTimeoutRef = useRef<number | null>(null);
@@ -76,7 +105,7 @@ export default function CommandCard({ cmd, groupColor, onCopy, onEdit, onDelete,
     <div className="border border-border rounded-lg bg-card p-4 hover:border-muted-foreground/30 transition-colors animate-fade-in border-l-[3px]" style={{ borderLeftColor: groupColor || 'var(--border)' }}>
       {/* Title row */}
       <div className="flex items-start justify-between gap-2 mb-2">
-        <h3 className="font-medium text-sm text-card-foreground leading-snug">{cmd.title}</h3>
+        <h3 className="font-medium text-sm text-card-foreground leading-snug">{highlightText(cmd.title, highlightTerms)}</h3>
         <button onClick={() => onToggleFavorite(cmd.id)} className="shrink-0 p-0.5">
           <Star className={`w-4 h-4 transition-colors ${cmd.isFavorite ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground hover:text-yellow-400"}`} />
         </button>
@@ -86,7 +115,7 @@ export default function CommandCard({ cmd, groupColor, onCopy, onEdit, onDelete,
       <div className="relative group">
         <pre className={`bg-code-bg text-code-fg font-mono text-xs rounded-md p-3 overflow-x-auto whitespace-pre-wrap break-all ${!expanded && isLong ? "max-h-[60px] overflow-hidden" : ""
           }`}>
-          {renderBash(cmd.command)}
+          {renderBash(cmd.command, highlightTerms)}
         </pre>
         {isLong && (
           <button
@@ -101,7 +130,7 @@ export default function CommandCard({ cmd, groupColor, onCopy, onEdit, onDelete,
 
       {/* Description */}
       {cmd.description && (
-        <p className="text-xs text-muted-foreground mt-2 leading-relaxed">{cmd.description}</p>
+        <p className="text-xs text-muted-foreground mt-2 leading-relaxed">{highlightText(cmd.description, highlightTerms)}</p>
       )}
 
       {/* Tags */}

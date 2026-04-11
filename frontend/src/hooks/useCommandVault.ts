@@ -460,12 +460,18 @@ export function useCommandVault(token: string) {
     })();
   }, [fetchCommandsPage, token]);
 
-  const searchCommands = useCallback(async (q: string, options?: { groupId?: number; limit?: number }) => {
+  const searchCommands = useCallback(async (
+    q: string,
+    options?: { groupId?: number; limit?: number; tags?: string[]; isFavorite?: boolean; signal?: AbortSignal }
+  ) => {
     const res = await apiRequest<ApiSearchResponse>("/search", {
       token,
+      signal: options?.signal,
       query: {
         q,
         group_id: options?.groupId,
+        is_favorite: options?.isFavorite,
+        tag: options?.tags,
         limit: options?.limit ?? 200,
       },
     });

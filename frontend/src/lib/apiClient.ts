@@ -45,7 +45,8 @@ export async function apiRequest<T>(
         method?: string;
         token?: string | null;
         json?: unknown;
-        query?: Record<string, string | number | boolean | null | undefined>;
+        query?: Record<string, string | number | boolean | Array<string | number | boolean> | null | undefined>;
+        signal?: AbortSignal;
     } = {}
 ): Promise<T> {
     const baseUrl = getBaseUrl();
@@ -53,7 +54,13 @@ export async function apiRequest<T>(
     if (options.query) {
         for (const [key, value] of Object.entries(options.query)) {
             if (value === undefined || value === null) continue;
-            url.searchParams.set(key, String(value));
+            if (Array.isArray(value)) {
+                for (const item of value) {
+                    url.searchParams.append(key, String(item));
+                }
+            } else {
+                url.searchParams.set(key, String(value));
+            }
         }
     }
 
@@ -72,6 +79,7 @@ export async function apiRequest<T>(
         method: options.method ?? "GET",
         headers,
         body: options.json !== undefined ? JSON.stringify(options.json) : undefined,
+        signal: options.signal,
     });
 
     if (!res.ok) {

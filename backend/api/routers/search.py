@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import case, func, literal, or_, select
+from sqlalchemy import and_, case, func, literal, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from ..database import get_db
@@ -18,12 +18,14 @@ router = APIRouter(
 
 @router.get("", response_model=SearchResponse)
 def search_commands(
-    q: str = Query(min_length=1),
+    q: str | None = Query(default=None),
     group_id: int | None = Query(default=None),
+    is_favorite: bool | None = Query(default=None),
+    tag: list[str] | None = Query(default=None),
     limit: int = Query(default=20, ge=1, le=200),
     db: Session = Depends(get_db),
 ) -> SearchResponse:
-    q_norm = q.strip().lower()
+    q_norm = (q or "").strip().lower()
     # Split on any whitespace; keep it simple and predictable.
     raw_tokens = [t for t in re.split(r"\s+", q_norm) if t]
     tokens: list[str] = []
@@ -39,7 +41,9 @@ def search_commands(
     # Avoid generating huge SQL on extremely long queries.
     tokens = tokens[:10]
 
-    if not tokens:
+    normalized_tags = [t.strip().lower() for t in (tag or []) if (t or "").strip()]
+
+    if not tokens and not normalized_tags and is_favorite is None and group_id is None:
         return SearchResponse(items=[])
 
     def token_any_match(token: str):
@@ -52,7 +56,24 @@ def search_commands(
         )
 
     token_matches = [token_any_match(t) for t in tokens]
-    where_clause = or_(*token_matches)
+    clauses = []
+
+    if token_matches:
+        clauses.append(or_(*token_matches))
+
+    if normalized_tags:
+        clauses.append(Command.tag_entities.any(Tag.name.in_(normalized_tags)))
+
+    if is_favorite is not None:
+        clauses.append(Command.is_favorite == is_favorite)
+
+    if group_id is not None:
+        clauses.append(Command.group_id == group_id)
+
+    if not clauses:
+        return SearchResponse(items=[])
+
+    where_clause = and_(*clauses) if len(clauses) > 1 else clauses[0]
 
     score = literal(0)
     for match_expr in token_matches:
@@ -65,9 +86,6 @@ def search_commands(
         .order_by(score.desc(), Command.updated_at.desc())
         .limit(limit)
     )
-
-    if group_id is not None:
-        stmt = stmt.where(Command.group_id == group_id)
 
     rows = db.execute(stmt).all()
     items = [row[0] for row in rows]
