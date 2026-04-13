@@ -1,4 +1,5 @@
 import { X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 interface Props {
     open: boolean;
@@ -6,6 +7,7 @@ interface Props {
 }
 
 export default function HelpModal({ open, onClose }: Props) {
+    const { t } = useTranslation();
     if (!open) return null;
 
     return (
@@ -15,122 +17,104 @@ export default function HelpModal({ open, onClose }: Props) {
                 <button
                     onClick={onClose}
                     className="absolute top-4 right-4 p-1 rounded-md hover:bg-surface-hover text-muted-foreground"
-                    aria-label="Fermer"
-                    title="Fermer"
+                    aria-label={t("common.close")}
+                    title={t("common.close")}
                 >
                     <X className="w-4 h-4" />
                 </button>
 
-                <h2 className="text-lg font-semibold text-card-foreground pr-8">Aide</h2>
-                <p className="text-sm text-muted-foreground mt-1">
-                    Raccourcis clavier, recherche, variables et actions rapides.
-                </p>
+                <h2 className="text-lg font-semibold text-card-foreground pr-8">{t("help.title")}</h2>
+                <p className="text-sm text-muted-foreground mt-1">{t("help.subtitle")}</p>
 
                 <div className="mt-6 space-y-6">
                     <section>
-                        <h3 className="text-sm font-semibold text-foreground">Raccourcis</h3>
+                        <h3 className="text-sm font-semibold text-foreground">{t("help.shortcuts")}</h3>
                         <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
                             <li>
-                                <span className="font-mono text-foreground">Ctrl/Cmd + P</span> : ouvrir la palette (recherche rapide)
+                                <span className="font-mono text-foreground">Ctrl/Cmd + P</span> : {t("help.shortcutsCtrlP")}
                             </li>
                             <li>
-                                <span className="font-mono text-foreground">Ctrl/Cmd + K</span> : focus sur la recherche
+                                <span className="font-mono text-foreground">Ctrl/Cmd + K</span> : {t("help.shortcutsCtrlK")}
                             </li>
                             <li>
-                                <span className="font-mono text-foreground">Entrée</span> (palette) : copier la commande sélectionnée
+                                <span className="font-mono text-foreground">Entrée</span> : {t("help.shortcutsEnter")}
                             </li>
                             <li>
-                                <span className="font-mono text-foreground">Esc</span> : fermer la palette / les modals
+                                <span className="font-mono text-foreground">Esc</span> : {t("help.shortcutsEsc")}
                             </li>
                         </ul>
                     </section>
 
                     <section>
-                        <h3 className="text-sm font-semibold text-foreground">Palette (Ctrl/Cmd + P)</h3>
+                        <h3 className="text-sm font-semibold text-foreground">{t("help.palette")}</h3>
                         <div className="mt-2 text-sm text-muted-foreground space-y-2">
-                            <p>
-                                La palette s’ouvre en overlay et affiche par défaut les <strong className="text-foreground">10 commandes les plus copiées</strong>.
-                                Quand tu commences à taper, elle lance une recherche serveur.
-                            </p>
-                            <p>
-                                Le nombre à droite correspond au <strong className="text-foreground">nombre de copies</strong>.
-                            </p>
+                            <p>{t("help.paletteDefault")}</p>
+                            <p>{t("help.paletteRightNumber")}</p>
                         </div>
                     </section>
 
                     <section>
-                        <h3 className="text-sm font-semibold text-foreground">Recherche avancée</h3>
+                        <h3 className="text-sm font-semibold text-foreground">{t("help.advancedSearch")}</h3>
                         <div className="mt-2 text-sm text-muted-foreground space-y-2">
-                            <p>
-                                Tu peux utiliser des opérateurs (dans la barre de recherche ou dans la palette) :
-                            </p>
+                            <p>{t("help.operators")}</p>
                             <ul className="space-y-1">
                                 <li>
-                                    <span className="font-mono text-foreground">tag:docker</span> — filtrer par tag
+                                    <span className="font-mono text-foreground">tag:docker</span> — {t("help.tag")}
                                 </li>
                                 <li>
-                                    <span className="font-mono text-foreground">group:prod</span> — filtrer par groupe (nom exact)
+                                    <span className="font-mono text-foreground">group:prod</span> — {t("help.group")}
                                 </li>
                                 <li>
-                                    <span className="font-mono text-foreground">fav:true</span> — seulement les favoris
+                                    <span className="font-mono text-foreground">fav:true</span> — {t("help.fav")}
                                 </li>
                             </ul>
                         </div>
                     </section>
 
                     <section>
-                        <h3 className="text-sm font-semibold text-foreground">Copie & variables</h3>
+                        <h3 className="text-sm font-semibold text-foreground">{t("help.copyVariables")}</h3>
                         <div className="mt-2 text-sm text-muted-foreground space-y-2">
                             <p>
-                                Si une commande contient des variables <span className="font-mono text-foreground">{"{{VAR}}"}</span>, le bouton Copy (ou la palette)
-                                ouvre un modal pour remplir les valeurs.
+                                {t("help.variables", { var: "{{VAR}}" })}
                             </p>
                             <ul className="space-y-1">
-                                <li>Copy as-is : copie la commande telle quelle</li>
-                                <li>Copy with values : remplace les variables par tes valeurs</li>
+                                <li>{t("help.copyAsIs")}</li>
+                                <li>{t("help.copyWithValues")}</li>
                             </ul>
                         </div>
                     </section>
 
                     <section>
-                        <h3 className="text-sm font-semibold text-foreground">Organisation & actions</h3>
+                        <h3 className="text-sm font-semibold text-foreground">{t("help.organization")}</h3>
                         <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-                            <li>Groupes : organise tes commandes par contexte (projet, environnement…)</li>
-                            <li>Tags : clique sur un tag d’une commande pour filtrer</li>
-                            <li>Favoris : l’étoile permet de marquer une commande</li>
-                            <li>Tri : Recent / Most copied</li>
-                            <li>Affichage : Vertical / Horizontal</li>
-                            <li>Vue : bouton View pour ouvrir une commande en modal</li>
+                            <li>{t("help.groupsLine")}</li>
+                            <li>{t("help.tagsLine")}</li>
+                            <li>{t("help.favoritesLine")}</li>
+                            <li>{t("help.sortLine")}</li>
+                            <li>{t("help.layoutLine")}</li>
+                            <li>{t("help.viewLine")}</li>
                         </ul>
                     </section>
 
                     <section>
-                        <h3 className="text-sm font-semibold text-foreground">Sélection multiple</h3>
+                        <h3 className="text-sm font-semibold text-foreground">{t("help.multiSelect")}</h3>
                         <div className="mt-2 text-sm text-muted-foreground space-y-2">
-                            <p>
-                                Active le mode <strong className="text-foreground">Select</strong> pour cocher plusieurs commandes.
-                                Une barre d’actions s’affiche en bas (Move / Export / Favorite / Delete).
-                            </p>
+                            <p>{t("help.multiSelectText")}</p>
                         </div>
                     </section>
 
                     <section>
-                        <h3 className="text-sm font-semibold text-foreground">Import / Export</h3>
+                        <h3 className="text-sm font-semibold text-foreground">{t("help.importExport")}</h3>
                         <div className="mt-2 text-sm text-muted-foreground space-y-2">
-                            <p>
-                                Export (JSON/CSV/PDF) et import JSON sont accessibles depuis la sidebar.
-                                Tu peux aussi exporter une sélection via la barre d’actions.
-                            </p>
-                            <p>
-                                Tu peux aussi importer ton <strong className="text-foreground">historique shell</strong> (bash/zsh) via “Importer historique”.
-                            </p>
+                            <p>{t("help.importExportText")}</p>
+                            <p>{t("help.importHistoryText")}</p>
                         </div>
                     </section>
 
                     <section>
-                        <h3 className="text-sm font-semibold text-foreground">Dashboard</h3>
+                        <h3 className="text-sm font-semibold text-foreground">{t("help.dashboard")}</h3>
                         <div className="mt-2 text-sm text-muted-foreground">
-                            Le dashboard affiche des compteurs (commandes, groupes, tags) et les copies sur une plage de dates.
+                            {t("help.dashboardText")}
                         </div>
                     </section>
                 </div>
@@ -140,7 +124,7 @@ export default function HelpModal({ open, onClose }: Props) {
                         onClick={onClose}
                         className="px-4 py-2 text-sm rounded-md bg-accent-blue text-accent-blue-foreground hover:opacity-90 transition-all font-medium"
                     >
-                        Fermer
+                        {t("common.close")}
                     </button>
                 </div>
             </div>

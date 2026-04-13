@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Group } from "@/hooks/useCommandVault";
 import { Button } from "@/components/ui/button";
+import { useTranslation } from "react-i18next";
 import {
     Dialog,
     DialogContent,
@@ -18,6 +19,7 @@ export default function BulkMoveModal(props: {
     onClose: () => void;
     onConfirm: (groupId: number) => Promise<void>;
 }) {
+    const { t } = useTranslation();
     const { open, groups, count, onClose, onConfirm } = props;
 
     const [groupId, setGroupId] = useState<number | null>(null);
@@ -37,14 +39,14 @@ export default function BulkMoveModal(props: {
         <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
             <DialogContent className="max-w-md">
                 <DialogHeader>
-                    <DialogTitle>Move commands</DialogTitle>
+                    <DialogTitle>{t("bulkMove.title")}</DialogTitle>
                     <DialogDescription>
-                        Move {count} selected command{count === 1 ? "" : "s"} to a group.
+                        {t("bulkMove.description", { count })}
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="space-y-2">
-                    <label className="text-xs font-medium text-muted-foreground">Destination group</label>
+                    <label className="text-xs font-medium text-muted-foreground">{t("bulkMove.destinationGroup")}</label>
                     <select
                         value={groupId ?? ""}
                         onChange={(e) => setGroupId(e.target.value ? Number(e.target.value) : null)}
@@ -52,7 +54,7 @@ export default function BulkMoveModal(props: {
                         disabled={moving || sortedGroups.length === 0}
                     >
                         {sortedGroups.length === 0 ? (
-                            <option value="">No groups</option>
+                            <option value="">{t("bulkMove.noGroups")}</option>
                         ) : (
                             sortedGroups.map((g) => (
                                 <option key={g.id} value={g.id}>
@@ -65,7 +67,7 @@ export default function BulkMoveModal(props: {
 
                 <DialogFooter>
                     <Button type="button" variant="ghost" onClick={onClose} disabled={moving}>
-                        Cancel
+                        {t("common.cancel")}
                     </Button>
                     <Button
                         type="button"
@@ -86,7 +88,7 @@ export default function BulkMoveModal(props: {
                         disabled={moving || groupId == null}
                     >
                         {moving && <Loader2 className="w-4 h-4 animate-spin" />}
-                        Move
+                        {t("common.move")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

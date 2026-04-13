@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Loader2, X } from "lucide-react";
 import { Group } from "@/hooks/useCommandVault";
+import { useTranslation } from "react-i18next";
 
 const EMOJI_PRESETS = ["📁", "🐳", "🚀", "⚙️", "🔧", "💻", "🌐", "📦", "🎯", "🔒", "📝", "🎨"];
 const COLOR_PRESETS = ["#3b82f6", "#ef4444", "#22c55e", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316"];
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export default function GroupModal({ group, open, onClose, onSave }: Props) {
+  const { t } = useTranslation();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [icon, setIcon] = useState("📁");
@@ -49,19 +51,19 @@ export default function GroupModal({ group, open, onClose, onSave }: Props) {
         >
           <X className="w-4 h-4" />
         </button>
-        <h2 className="text-lg font-semibold mb-4 text-card-foreground">{group ? "Edit Group" : "New Group"}</h2>
+        <h2 className="text-lg font-semibold mb-4 text-card-foreground">{group ? t("groupModal.editTitle") : t("groupModal.newTitle")}</h2>
 
         <div className="space-y-4">
           <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Name *</label>
-            <input value={name} onChange={(e) => setName(e.target.value)} className="w-full px-3 py-2 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent-blue" placeholder="Group name" />
+            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">{t("groupModal.name")}</label>
+            <input value={name} onChange={(e) => setName(e.target.value)} className="w-full px-3 py-2 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent-blue" placeholder={t("groupModal.namePlaceholder")} />
           </div>
           <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Description</label>
-            <input value={description} onChange={(e) => setDescription(e.target.value)} className="w-full px-3 py-2 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent-blue" placeholder="Optional description" />
+            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">{t("groupModal.description")}</label>
+            <input value={description} onChange={(e) => setDescription(e.target.value)} className="w-full px-3 py-2 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent-blue" placeholder={t("groupModal.descriptionPlaceholder")} />
           </div>
           <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Icon</label>
+            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">{t("groupModal.icon")}</label>
             <div className="flex flex-wrap items-center gap-2">
               <input value={icon} onChange={(e) => { const val = e.target.value; if ([...val].length <= 2) setIcon(val); }} className="w-10 h-9 text-center text-lg rounded-md border border-input bg-background focus:outline-none focus:ring-2 focus:ring-accent-blue" />
               {EMOJI_PRESETS.map((e) => (
@@ -70,7 +72,7 @@ export default function GroupModal({ group, open, onClose, onSave }: Props) {
             </div>
           </div>
           <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Color</label>
+            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">{t("groupModal.color")}</label>
             <div className="flex flex-wrap gap-2">
               {COLOR_PRESETS.map((c) => (
                 <button key={c} onClick={() => setColor(c)} className={`w-7 h-7 rounded-full transition-all ${color === c ? "ring-2 ring-offset-2 ring-offset-card ring-accent-blue scale-110" : "hover:scale-110"}`} style={{ backgroundColor: c }} />
@@ -87,7 +89,7 @@ export default function GroupModal({ group, open, onClose, onSave }: Props) {
             disabled={saving}
             className="px-4 py-2 text-sm rounded-md hover:bg-surface-hover text-muted-foreground transition-colors disabled:opacity-50"
           >
-            Cancel
+            {t("common.cancel")}
           </button>
           <button
             onClick={async () => {
@@ -106,7 +108,7 @@ export default function GroupModal({ group, open, onClose, onSave }: Props) {
             className="px-4 py-2 text-sm rounded-md bg-accent-blue text-accent-blue-foreground hover:opacity-90 disabled:opacity-40 transition-all font-medium inline-flex items-center gap-2"
           >
             {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-            {group ? "Save" : "Create"}
+            {group ? t("common.save") : t("common.create")}
           </button>
         </div>
       </div>

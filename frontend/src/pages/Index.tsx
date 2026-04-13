@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Search, Plus, FileCode, Loader2, LayoutGrid, LayoutList, ArrowDownUp, ArrowUp, X, ListChecks } from "lucide-react";
 import { toast } from "sonner";
+import { Trans, useTranslation } from "react-i18next";
 import { useCommandVault, Command, Group, VaultData } from "@/hooks/useCommandVault";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/hooks/useAuth";
@@ -92,6 +93,7 @@ function extractHighlightTerms(input: string): string[] {
 }
 
 function VaultPage({ token, onLogout }: { token: string; onLogout: () => void }) {
+  const { t } = useTranslation();
   const vault = useCommandVault(token);
   const theme = useTheme();
 
@@ -313,7 +315,7 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
     setSearchLoading(true);
     setSearchResults(null);
 
-    const t = window.setTimeout(() => {
+    const timeoutId = window.setTimeout(() => {
       void vault
         .searchCommands(parsed.text, { groupId, limit: 200, tags, isFavorite, signal: controller.signal })
         .then((items) => {
@@ -334,7 +336,7 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
     return () => {
       cancelled = true;
       controller.abort();
-      window.clearTimeout(t);
+      window.clearTimeout(timeoutId);
     };
   }, [search, activeView, vault.searchCommands, vault.data.groups]);
 
@@ -344,12 +346,12 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
     : null;
 
   const viewTitle = activeView === "dashboard"
-    ? "Dashboard"
+    ? t("vault.view.dashboard")
     : activeView === "all"
-      ? "All Commands"
+      ? t("vault.view.all")
       : activeView === "favorites"
-        ? "Favorites"
-        : currentGroup?.name ?? "Commands";
+        ? t("vault.view.favorites")
+        : currentGroup?.name ?? t("vault.view.commands");
 
   useEffect(() => {
     if (activeView !== "dashboard") return;
@@ -465,11 +467,11 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
       try {
         const imported = JSON.parse(e.target?.result as string) as VaultData;
         if (!imported.groups || !imported.commands) throw new Error();
-        const toastId = toast.loading("Importing...");
+        const toastId = toast.loading(t("vault.importingToast"));
         void vault
           .importData(imported)
           .then(({ groups, commands }) => {
-            toast.success(`Imported successfully (${groups} groups, ${commands} commands)`, { id: toastId });
+            toast.success(t("vault.importSuccess", { groups, commands }), { id: toastId });
 
             // Ensure the newly imported data is visible immediately.
             setSearch("");
@@ -479,14 +481,14 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
             setActiveView("all");
           })
           .catch((err) => {
-            toast.error((err as any)?.message ?? "Import failed", { id: toastId });
+            toast.error((err as any)?.message ?? t("vault.importFailed"), { id: toastId });
           });
       } catch {
-        toast.error("Invalid JSON file");
+        toast.error(t("vault.invalidJson"));
       }
     };
     reader.readAsText(file);
-  }, [vault]);
+  }, [t, vault]);
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -515,7 +517,7 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
         onImport={handleImport}
         onImportHistory={() => {
           if (vault.data.groups.length === 0) {
-            toast.info("Create a group first");
+            toast.info(t("vault.createGroupFirst"));
             return;
           }
           setHistoryImportOpen(true);
@@ -536,14 +538,14 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
           {vault.loading && vault.data.groups.length === 0 && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
               <Loader2 className="w-4 h-4 animate-spin" />
-              Loading...
+              {t("common.loading")}
             </div>
           )}
 
           {vault.importing && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
               <Loader2 className="w-4 h-4 animate-spin" />
-              Importing...
+              {t("common.importing")}
             </div>
           )}
 
@@ -559,8 +561,8 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
                 </div>
                 {currentGroup && (
                   <div className="flex items-center gap-1">
-                    <button onClick={() => { setEditGroup(currentGroup); setGroupModal(true); }} className="px-3 py-1.5 text-xs rounded-md hover:bg-surface-hover text-muted-foreground transition-colors">Edit</button>
-                    <button onClick={() => setDeleteTarget({ type: "group", id: currentGroup.id, title: currentGroup.name })} className="px-3 py-1.5 text-xs rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors">Delete</button>
+                    <button onClick={() => { setEditGroup(currentGroup); setGroupModal(true); }} className="px-3 py-1.5 text-xs rounded-md hover:bg-surface-hover text-muted-foreground transition-colors">{t("common.edit")}</button>
+                    <button onClick={() => setDeleteTarget({ type: "group", id: currentGroup.id, title: currentGroup.name })} className="px-3 py-1.5 text-xs rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors">{t("common.delete")}</button>
                   </div>
                 )}
               </div>
@@ -588,8 +590,8 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
                           setTimeout(() => searchInputRef.current?.focus(), 0);
                         }}
                         className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-surface-hover transition-colors"
-                        aria-label="Clear search"
-                        title="Clear search"
+                        aria-label={t("vault.search.clear")}
+                        title={t("vault.search.clear")}
                       >
                         <X className="w-4 h-4" />
                       </button>
@@ -598,8 +600,8 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
                       id="vault-search"
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
-                      placeholder="Search commands... (Ctrl+K)"
-                      title="Advanced search: tag:docker group:prod fav:true"
+                      placeholder={t("vault.search.placeholder")}
+                      title={t("vault.search.advancedTitle")}
                       ref={searchInputRef}
                       className="w-full pl-9 pr-9 py-2 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent-blue placeholder:text-muted-foreground"
                     />
@@ -608,21 +610,21 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
                   <button
                     onClick={() => setLayout((prev) => (prev === "vertical" ? "horizontal" : "vertical"))}
                     disabled={vault.loading}
-                    title={layout === "vertical" ? "Switch to horizontal" : "Switch to vertical"}
+                    title={layout === "vertical" ? t("vault.layout.switchToHorizontal") : t("vault.layout.switchToVertical")}
                     className="inline-flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-md border border-input bg-background text-muted-foreground hover:text-foreground hover:bg-surface-hover disabled:opacity-50 transition-colors"
                   >
                     {layout === "vertical" ? <LayoutGrid className="w-4 h-4" /> : <LayoutList className="w-4 h-4" />}
-                    <span className="hidden sm:inline">{layout === "vertical" ? "Horizontal" : "Vertical"}</span>
+                    <span className="hidden sm:inline">{layout === "vertical" ? t("vault.layout.horizontal") : t("vault.layout.vertical")}</span>
                   </button>
 
                   <button
                     onClick={() => setSortMode((prev) => (prev === "recent" ? "mostCopied" : "recent"))}
                     disabled={vault.loading}
-                    title={sortMode === "mostCopied" ? "Sort: most copied" : "Sort: recent"}
+                    title={sortMode === "mostCopied" ? t("vault.sort.titleMostCopied") : t("vault.sort.titleRecent")}
                     className={`inline-flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-md border border-input bg-background transition-colors disabled:opacity-50 ${sortMode === "mostCopied" ? "text-foreground bg-surface-active" : "text-muted-foreground hover:text-foreground hover:bg-surface-hover"}`}
                   >
                     <ArrowDownUp className="w-4 h-4" />
-                    <span className="hidden sm:inline">{sortMode === "mostCopied" ? "Most copied" : "Recent"}</span>
+                    <span className="hidden sm:inline">{sortMode === "mostCopied" ? t("vault.sort.mostCopied") : t("vault.sort.recent")}</span>
                   </button>
 
                   <button
@@ -634,17 +636,17 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
                       });
                     }}
                     disabled={vault.loading}
-                    title={selectionMode ? "Exit selection" : "Select multiple commands"}
+                    title={selectionMode ? t("vault.selection.exit") : t("vault.selection.selectMultiple")}
                     className={`inline-flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-md border border-input bg-background transition-colors disabled:opacity-50 ${selectionMode ? "text-foreground bg-surface-active" : "text-muted-foreground hover:text-foreground hover:bg-surface-hover"}`}
                   >
                     <ListChecks className="w-4 h-4" />
-                    <span className="hidden sm:inline">{selectionMode ? "Selecting" : "Select"}</span>
+                    <span className="hidden sm:inline">{selectionMode ? t("vault.selection.selecting") : t("vault.selection.select")}</span>
                   </button>
 
                   <button
                     onClick={() => {
                       if (vault.data.groups.length === 0) {
-                        toast.info("Create a group first");
+                        toast.info(t("vault.createGroupFirst"));
                         setEditGroup(null);
                         setGroupModal(true);
                         return;
@@ -655,30 +657,30 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
                     disabled={vault.loading}
                     className="flex items-center gap-2 px-4 py-2 text-sm rounded-md bg-accent-blue text-accent-blue-foreground hover:opacity-90 disabled:opacity-50 transition-all font-medium whitespace-nowrap"
                   >
-                    <Plus className="w-4 h-4" /> Add Command
+                    <Plus className="w-4 h-4" /> {t("vault.addCommand")}
                   </button>
 
                   <button
                     onClick={() => setHelpOpen(true)}
                     disabled={vault.loading}
                     className="inline-flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-md border border-input bg-background text-muted-foreground hover:text-foreground hover:bg-surface-hover disabled:opacity-50 transition-colors"
-                    title="Aide"
+                    title={t("help.title")}
                   >
-                    Aide
+                    {t("help.title")}
                   </button>
                 </div>
 
                 <div className="mt-1 text-[11px] text-muted-foreground pl-9">
-                  Tips: <span className="font-mono">tag:docker</span> <span className="font-mono">group:prod</span> <span className="font-mono">fav:true</span>
+                  {t("vault.tips")} <span className="font-mono">tag:docker</span> <span className="font-mono">group:prod</span> <span className="font-mono">fav:true</span>
                 </div>
               </div>
             ) : (
               <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-3">
                 <div className="flex-1">
-                  <div className="text-xs font-medium text-muted-foreground mb-2">Copies date range</div>
+                  <div className="text-xs font-medium text-muted-foreground mb-2">{t("vault.dashboard.copiesDateRange")}</div>
                   <div className="flex flex-col sm:flex-row gap-2">
                     <div className="flex items-center gap-2">
-                      <label className="text-xs text-muted-foreground">From</label>
+                      <label className="text-xs text-muted-foreground">{t("vault.dashboard.from")}</label>
                       <input
                         type="date"
                         value={dashFrom}
@@ -687,7 +689,7 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
                       />
                     </div>
                     <div className="flex items-center gap-2">
-                      <label className="text-xs text-muted-foreground">To</label>
+                      <label className="text-xs text-muted-foreground">{t("vault.dashboard.to")}</label>
                       <input
                         type="date"
                         value={dashTo}
@@ -700,11 +702,18 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
 
                 <div className="text-sm text-muted-foreground">
                   {dashLoading ? (
-                    <span className="inline-flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Loading...</span>
+                    <span className="inline-flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> {t("vault.dashboard.loading")}</span>
                   ) : dashStats ? (
-                    <span>Showing copies from <span className="font-medium text-foreground">{dashStats.from_date}</span> to <span className="font-medium text-foreground">{dashStats.to_date}</span></span>
+                    <Trans
+                      i18nKey="vault.dashboard.showingCopies"
+                      values={{ from: dashStats.from_date, to: dashStats.to_date }}
+                      components={{
+                        from: <span className="font-medium text-foreground" />,
+                        to: <span className="font-medium text-foreground" />,
+                      }}
+                    />
                   ) : (
-                    <span>Unable to load stats</span>
+                    <span>{t("vault.dashboard.unableToLoad")}</span>
                   )}
                 </div>
 
@@ -712,9 +721,9 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
                   <button
                     onClick={() => setHelpOpen(true)}
                     className="inline-flex items-center justify-center px-3 py-2 text-sm rounded-md border border-input bg-background text-muted-foreground hover:text-foreground hover:bg-surface-hover transition-colors"
-                    title="Aide"
+                    title={t("help.title")}
                   >
-                    Aide
+                    {t("help.title")}
                   </button>
                 </div>
               </div>
@@ -730,7 +739,7 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
                     onClick={() => setTagFilters([])}
                     className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
                   >
-                    Clear
+                    {t("vault.tagFilter.clear")}
                   </button>
                 </div>
               )}
@@ -759,7 +768,7 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
                   onClick={() => setTagsExpanded((v) => !v)}
                   className="mt-2 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  {tagsExpanded ? "Show less" : "Show all"}
+                  {tagsExpanded ? t("vault.tagFilter.showLess") : t("vault.tagFilter.showAll")}
                 </button>
               )}
             </div>
@@ -769,19 +778,19 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
           {activeView === "dashboard" ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-3">
               <div className="border border-border rounded-lg bg-card p-4">
-                <div className="text-xs text-muted-foreground">Commands</div>
+                <div className="text-xs text-muted-foreground">{t("vault.dashboard.commands")}</div>
                 <div className="text-2xl font-semibold text-foreground mt-1">{dashStats?.commands ?? "—"}</div>
               </div>
               <div className="border border-border rounded-lg bg-card p-4">
-                <div className="text-xs text-muted-foreground">Groups</div>
+                <div className="text-xs text-muted-foreground">{t("vault.dashboard.groups")}</div>
                 <div className="text-2xl font-semibold text-foreground mt-1">{dashStats?.groups ?? "—"}</div>
               </div>
               <div className="border border-border rounded-lg bg-card p-4">
-                <div className="text-xs text-muted-foreground">Tags</div>
+                <div className="text-xs text-muted-foreground">{t("vault.dashboard.tags")}</div>
                 <div className="text-2xl font-semibold text-foreground mt-1">{dashStats?.tags ?? "—"}</div>
               </div>
               <div className="border border-border rounded-lg bg-card p-4">
-                <div className="text-xs text-muted-foreground">Copies (range)</div>
+                <div className="text-xs text-muted-foreground">{t("vault.dashboard.copiesRange")}</div>
                 <div className="text-2xl font-semibold text-foreground mt-1">{dashStats?.copies ?? "—"}</div>
               </div>
             </div>
@@ -818,7 +827,7 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
                   onDelete={(c) => setDeleteTarget({ type: "command", id: c.id, title: c.title })}
                   onToggleFavorite={(id) => {
                     void vault.toggleFavorite(id).catch((e: any) => {
-                      toast.error(e?.message ?? "Failed to update favorite");
+                      toast.error(e?.message ?? t("vault.updateFavoriteFailed"));
                     });
                   }}
                   onTagClick={toggleTagFilter}
@@ -842,7 +851,7 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
                   {vault.commandsLoadingMore && (
                     <div className={`${layout === "horizontal" ? "sm:col-span-2" : ""} flex items-center justify-center py-4 text-sm text-muted-foreground`}>
                       <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                      Loading more...
+                      {t("vault.loadingMore")}
                     </div>
                   )}
                 </>
@@ -852,11 +861,11 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
             <div className="flex flex-col items-center justify-center py-20 text-center">
               <FileCode className="w-12 h-12 text-muted-foreground/40 mb-4" />
               {search ? (
-                <p className="text-sm text-muted-foreground">No results for \"{search}\"</p>
+                <p className="text-sm text-muted-foreground">{t("vault.noResults", { query: search })}</p>
               ) : (
                 <>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">No commands yet</p>
-                  <p className="text-xs text-muted-foreground">Add your first command to get started.</p>
+                  <p className="text-sm font-medium text-muted-foreground mb-1">{t("vault.noCommandsTitle")}</p>
+                  <p className="text-xs text-muted-foreground">{t("vault.noCommandsSubtitle")}</p>
                 </>
               )}
             </div>
@@ -868,8 +877,8 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
         type="button"
         onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
         className="fixed bottom-6 right-6 z-30 inline-flex items-center justify-center w-10 h-10 rounded-full border border-input bg-background text-muted-foreground hover:text-foreground hover:bg-surface-hover transition-colors"
-        aria-label="Scroll to top"
-        title="Scroll to top"
+        aria-label={t("vault.scrollTop")}
+        title={t("vault.scrollTop")}
       >
         <ArrowUp className="w-4 h-4" />
       </button>
@@ -883,13 +892,13 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
           try {
             if (editGroup) {
               await vault.updateGroup(editGroup.id, data);
-              toast.success("Group updated");
+              toast.success(t("vault.toast.groupUpdated"));
             } else {
               await vault.addGroup(data);
-              toast.success("Group created");
+              toast.success(t("vault.toast.groupCreated"));
             }
           } catch (e: any) {
-            toast.error(e?.message ?? "Failed to save group");
+            toast.error(e?.message ?? t("vault.toast.saveGroupFailed"));
             throw e;
           }
         }}
@@ -900,7 +909,7 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-[min(42rem,calc(100%-1.5rem))]">
           <div className="bg-card border border-border rounded-xl shadow-lg px-3 py-2 flex items-center justify-between gap-3">
             <div className="text-sm text-foreground">
-              <span className="font-medium">{selectedCount}</span> selected
+              {t("vault.selected", { count: selectedCount })}
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -908,7 +917,7 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
                 disabled={vault.data.groups.length === 0 || bulkDeleting || bulkFavoriting}
                 className="px-3 py-1.5 text-sm rounded-md border border-input hover:bg-surface-hover transition-colors disabled:opacity-50"
               >
-                Move
+                {t("common.move")}
               </button>
               <button
                 onClick={() => {
@@ -918,22 +927,22 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
                 disabled={bulkDeleting || bulkFavoriting}
                 className="px-3 py-1.5 text-sm rounded-md border border-input hover:bg-surface-hover transition-colors disabled:opacity-50"
               >
-                Export
+                {t("common.exportSelection")}
               </button>
               <button
                 onClick={() => {
                   if (bulkFavoriting) return;
                   const ids = Array.from(selectedIds);
-                  const toastId = toast.loading("Updating favorites...");
+                  const toastId = toast.loading(t("vault.updatingFavorites"));
                   void (async () => {
                     try {
                       setBulkFavoriting(true);
                       await bulkPatchCommands(ids, { is_favorite: true });
                       await vault.reload();
-                      toast.success("Updated", { id: toastId });
+                      toast.success(t("common.updated"), { id: toastId });
                       setSelectedIds(new Set());
                     } catch (e: any) {
-                      toast.error(e?.message ?? "Failed", { id: toastId });
+                      toast.error(e?.message ?? t("vault.toast.failed"), { id: toastId });
                     } finally {
                       setBulkFavoriting(false);
                     }
@@ -942,14 +951,14 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
                 disabled={bulkDeleting}
                 className="px-3 py-1.5 text-sm rounded-md border border-input hover:bg-surface-hover transition-colors disabled:opacity-50"
               >
-                Favorite
+                {t("common.favorite")}
               </button>
               <button
                 onClick={() => setBulkDeleteOpen(true)}
                 className="px-3 py-1.5 text-sm rounded-md bg-destructive text-destructive-foreground hover:opacity-90 transition-colors disabled:opacity-60"
                 disabled={bulkFavoriting}
               >
-                Delete
+                {t("common.delete")}
               </button>
               <button
                 onClick={() => {
@@ -959,7 +968,7 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
                 disabled={bulkDeleting || bulkFavoriting}
                 className="px-3 py-1.5 text-sm rounded-md hover:bg-surface-hover text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
               >
-                Done
+                {t("common.done")}
               </button>
             </div>
           </div>
@@ -976,13 +985,13 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
           try {
             if (editCmd) {
               await vault.updateCommand(editCmd.id, data);
-              toast.success("Command saved");
+              toast.success(t("vault.toast.commandSaved"));
             } else {
               await vault.addCommand({ ...data, copyCount: 0 });
-              toast.success("Command saved");
+              toast.success(t("vault.toast.commandSaved"));
             }
           } catch (e: any) {
-            toast.error(e?.message ?? "Failed to save command");
+            toast.error(e?.message ?? t("vault.toast.saveCommandFailed"));
             throw e;
           }
         }}
@@ -1057,9 +1066,9 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
               await vault.deleteGroup(deleteTarget.id);
               if (activeView === `group:${deleteTarget.id}`) setActiveView("all");
             }
-            toast.success("Deleted");
+            toast.success(t("common.deleted"));
           } catch (e: any) {
-            toast.error(e?.message ?? "Delete failed");
+            toast.error(e?.message ?? t("vault.deleteFailed"));
             throw e;
           }
         }}
@@ -1067,20 +1076,20 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
 
       <DeleteModal
         open={bulkDeleteOpen}
-        title={`${selectedCount} command${selectedCount === 1 ? "" : "s"}`}
+        title={t("vault.commandsCount", { count: selectedCount })}
         onClose={() => setBulkDeleteOpen(false)}
         onConfirm={async () => {
           if (bulkDeleting) return;
           const ids = Array.from(selectedIds);
-          const toastId = toast.loading("Deleting...");
+          const toastId = toast.loading(t("vault.deleting"));
           try {
             setBulkDeleting(true);
             await bulkDeleteCommands(ids);
             await vault.reload();
-            toast.success("Deleted", { id: toastId });
+            toast.success(t("common.deleted"), { id: toastId });
             setSelectedIds(new Set());
           } catch (e: any) {
-            toast.error(e?.message ?? "Delete failed", { id: toastId });
+            toast.error(e?.message ?? t("vault.deleteFailed"), { id: toastId });
             throw e;
           } finally {
             setBulkDeleting(false);
@@ -1104,14 +1113,14 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
         onClose={() => setBulkMoveOpen(false)}
         onConfirm={async (groupId) => {
           const ids = Array.from(selectedIds);
-          const toastId = toast.loading("Moving...");
+          const toastId = toast.loading(t("vault.moving"));
           try {
             await bulkPatchCommands(ids, { group_id: groupId });
             await vault.reload();
-            toast.success("Moved", { id: toastId });
+            toast.success(t("common.moved"), { id: toastId });
             setSelectedIds(new Set());
           } catch (e: any) {
-            toast.error(e?.message ?? "Move failed", { id: toastId });
+            toast.error(e?.message ?? t("vault.moveFailed"), { id: toastId });
             throw e;
           }
         }}
@@ -1121,6 +1130,7 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
 }
 
 const Index = () => {
+  const { t } = useTranslation();
   const auth = useAuth();
 
   const [loginUsername, setLoginUsername] = useState("");
@@ -1138,36 +1148,36 @@ const Index = () => {
       setLoginLoading(true);
       const res = await auth.login(loginUsername, loginPassword);
       if (res.must_change_password) {
-        toast.info("You must change your password (first login)");
+        toast.info(t("auth.mustChangePasswordToast"));
         setOldPassword(loginPassword);
         setNewPassword("");
       } else {
-        toast.success("Signed in");
+        toast.success(t("auth.signedInToast"));
       }
     } catch (e: any) {
-      toast.error(e?.message ?? "Sign-in failed");
+      toast.error(e?.message ?? t("auth.signInFailedToast"));
     } finally {
       setLoginLoading(false);
     }
-  }, [auth, loginUsername, loginPassword]);
+  }, [auth, loginUsername, loginPassword, t]);
 
   const handleChangePassword = useCallback(async () => {
     if (newPassword.trim().length < 6) {
-      toast.error("New password must be at least 6 characters");
+      toast.error(t("auth.newPasswordMinToast", { count: 6 }));
       return;
     }
     try {
       setChangeLoading(true);
       await auth.changePassword(oldPassword, newPassword);
-      toast.success("Password updated");
+      toast.success(t("auth.passwordUpdatedToast"));
       setOldPassword("");
       setNewPassword("");
     } catch (e: any) {
-      toast.error(e?.message ?? "Password update failed");
+      toast.error(e?.message ?? t("auth.passwordUpdateFailedToast"));
     } finally {
       setChangeLoading(false);
     }
-  }, [auth, oldPassword, newPassword]);
+  }, [auth, oldPassword, newPassword, t]);
 
   if (!auth.isAuthenticated) {
     return (
@@ -1175,13 +1185,13 @@ const Index = () => {
         <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 sm:p-8 shadow-lg">
           <div className="flex flex-col items-center text-center mb-6">
             <img src="/icon.png" alt="Command Keeper" className="h-12 w-auto" />
-            <h1 className="text-xl font-semibold text-foreground mt-4">Welcome to Command Keeper</h1>
-            <p className="text-sm text-muted-foreground mt-1">Sign in to access your command library.</p>
+            <h1 className="text-xl font-semibold text-foreground mt-4">{t("auth.welcomeTitle")}</h1>
+            <p className="text-sm text-muted-foreground mt-1">{t("auth.welcomeSubtitle")}</p>
           </div>
 
           <div className="space-y-3">
             <div>
-              <label className="block text-xs text-muted-foreground mb-1">Username</label>
+              <label className="block text-xs text-muted-foreground mb-1">{t("auth.username")}</label>
               <input
                 value={loginUsername}
                 onChange={(e) => setLoginUsername(e.target.value)}
@@ -1189,7 +1199,7 @@ const Index = () => {
               />
             </div>
             <div>
-              <label className="block text-xs text-muted-foreground mb-1">Password</label>
+              <label className="block text-xs text-muted-foreground mb-1">{t("auth.password")}</label>
               <input
                 type="password"
                 value={loginPassword}
@@ -1202,7 +1212,7 @@ const Index = () => {
               onClick={handleLogin}
               className="w-full px-4 py-2.5 text-sm rounded-md bg-accent-blue text-accent-blue-foreground hover:opacity-90 disabled:opacity-60 transition-all font-medium"
             >
-              {loginLoading ? "Signing in..." : "Sign in"}
+              {loginLoading ? t("auth.signingIn") : t("auth.signIn")}
             </button>
           </div>
         </div>
@@ -1216,13 +1226,13 @@ const Index = () => {
         <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 sm:p-8 shadow-lg">
           <div className="flex flex-col items-center text-center mb-6">
             <img src="/icon.png" alt="Command Keeper" className="h-12 w-auto" />
-            <h1 className="text-xl font-semibold text-foreground mt-4">Change your password</h1>
-            <p className="text-sm text-muted-foreground mt-1">Required on your first login.</p>
+            <h1 className="text-xl font-semibold text-foreground mt-4">{t("auth.changePasswordTitle")}</h1>
+            <p className="text-sm text-muted-foreground mt-1">{t("auth.changePasswordSubtitle")}</p>
           </div>
 
           <div className="space-y-3">
             <div>
-              <label className="block text-xs text-muted-foreground mb-1">Current password</label>
+              <label className="block text-xs text-muted-foreground mb-1">{t("auth.currentPassword")}</label>
               <input
                 type="password"
                 value={oldPassword}
@@ -1231,7 +1241,7 @@ const Index = () => {
               />
             </div>
             <div>
-              <label className="block text-xs text-muted-foreground mb-1">New password</label>
+              <label className="block text-xs text-muted-foreground mb-1">{t("auth.newPassword")}</label>
               <input
                 type="password"
                 value={newPassword}
@@ -1239,21 +1249,21 @@ const Index = () => {
                 minLength={6}
                 className="w-full px-3 py-2.5 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent-blue"
               />
-              <p className="text-[11px] text-muted-foreground mt-1">Minimum 6 characters.</p>
+              <p className="text-[11px] text-muted-foreground mt-1">{t("auth.minCharsHint", { count: 6 })}</p>
             </div>
             <button
               disabled={!canSubmitPasswordChange}
               onClick={handleChangePassword}
               className="w-full px-4 py-2.5 text-sm rounded-md bg-accent-blue text-accent-blue-foreground hover:opacity-90 disabled:opacity-60 transition-all font-medium"
             >
-              {changeLoading ? "Updating..." : "Update"}
+              {changeLoading ? t("auth.updating") : t("auth.update")}
             </button>
 
             <button
               onClick={() => auth.logout()}
               className="w-full px-4 py-2.5 text-sm rounded-md border border-input hover:bg-surface-hover transition-colors"
             >
-              Sign out
+              {t("auth.signOut")}
             </button>
           </div>
         </div>
@@ -1266,7 +1276,7 @@ const Index = () => {
       token={auth.token!}
       onLogout={() => {
         auth.logout();
-        toast.success("Signed out");
+        toast.success(t("auth.signedOutToast"));
       }}
     />
   );

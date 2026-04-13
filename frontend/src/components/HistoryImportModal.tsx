@@ -3,6 +3,7 @@ import { Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 import { apiRequest } from "@/lib/apiClient";
 import { Group } from "@/hooks/useCommandVault";
+import { useTranslation } from "react-i18next";
 
 type PreviewItem = {
     command: string;
@@ -43,6 +44,7 @@ export default function HistoryImportModal(props: {
     onImported: () => Promise<void>;
 }) {
     const { open, token, groups, onClose, onImported } = props;
+    const { t } = useTranslation();
 
     const fileRef = useRef<HTMLInputElement>(null);
 
@@ -89,22 +91,20 @@ export default function HistoryImportModal(props: {
                     }}
                     disabled={loading || importing}
                     className="absolute top-4 right-4 p-1 rounded-md hover:bg-surface-hover text-muted-foreground disabled:opacity-50"
-                    aria-label="Fermer"
-                    title="Fermer"
+                    aria-label={t("common.close")}
+                    title={t("common.close")}
                 >
                     <X className="w-4 h-4" />
                 </button>
 
-                <h2 className="text-lg font-semibold text-card-foreground pr-8">Importer l’historique shell</h2>
-                <p className="text-sm text-muted-foreground mt-1">
-                    Colle un extrait de ton <span className="font-mono text-foreground">.bash_history</span> / <span className="font-mono text-foreground">.zsh_history</span>, ou importe un fichier.
-                </p>
+                <h2 className="text-lg font-semibold text-card-foreground pr-8">{t("historyImport.title")}</h2>
+                <p className="text-sm text-muted-foreground mt-1">{t("historyImport.subtitle")}</p>
 
                 {step === "input" ? (
                     <div className="mt-6 space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Groupe cible *</label>
+                                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">{t("historyImport.targetGroup")}</label>
                                 <select
                                     value={groupId ?? ""}
                                     onChange={(e) => setGroupId(e.target.value ? Number(e.target.value) : null)}
@@ -112,7 +112,7 @@ export default function HistoryImportModal(props: {
                                     disabled={loading || importing || sortedGroups.length === 0}
                                 >
                                     {sortedGroups.length === 0 ? (
-                                        <option value="">Aucun groupe</option>
+                                        <option value="">{t("historyImport.noGroups")}</option>
                                     ) : (
                                         sortedGroups.map((g) => (
                                             <option key={g.id} value={g.id}>
@@ -122,17 +122,17 @@ export default function HistoryImportModal(props: {
                                     )}
                                 </select>
                                 {sortedGroups.length === 0 && (
-                                    <p className="text-xs text-muted-foreground mt-1">Crée un groupe avant d’importer un historique.</p>
+                                    <p className="text-xs text-muted-foreground mt-1">{t("historyImport.createGroupFirst")}</p>
                                 )}
                             </div>
 
                             <div>
-                                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Tags (séparés par des virgules)</label>
+                                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">{t("historyImport.tags")}</label>
                                 <input
                                     value={tagsText}
                                     onChange={(e) => setTagsText(e.target.value)}
                                     className="w-full px-3 py-2 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent-blue"
-                                    placeholder="ex: history, docker, prod"
+                                    placeholder={t("historyImport.tagsPlaceholder")}
                                     disabled={loading || importing}
                                 />
                             </div>
@@ -140,7 +140,7 @@ export default function HistoryImportModal(props: {
 
                         <div>
                             <div className="flex items-center justify-between gap-3">
-                                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Historique *</label>
+                                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">{t("historyImport.history")}</label>
                                 <div className="flex items-center gap-2">
                                     <input
                                         ref={fileRef}
@@ -164,7 +164,7 @@ export default function HistoryImportModal(props: {
                                         onClick={() => fileRef.current?.click()}
                                         disabled={loading || importing}
                                     >
-                                        Importer un fichier
+                                        {t("historyImport.importFile")}
                                     </button>
                                 </div>
                             </div>
@@ -176,7 +176,7 @@ export default function HistoryImportModal(props: {
                                 disabled={loading || importing}
                             />
                             <p className="text-xs text-muted-foreground mt-2">
-                                Le preview filtre les commandes “bruit” (ex: <span className="font-mono text-foreground">cd</span>, <span className="font-mono text-foreground">ls</span>) et ignore les doublons.
+                                {t("historyImport.hint")}
                             </p>
                         </div>
 
@@ -189,7 +189,7 @@ export default function HistoryImportModal(props: {
                                 disabled={loading || importing}
                                 className="px-4 py-2 text-sm rounded-md hover:bg-surface-hover text-muted-foreground transition-colors disabled:opacity-50"
                             >
-                                Annuler
+                                {t("common.cancel")}
                             </button>
                             <button
                                 type="button"
@@ -210,7 +210,7 @@ export default function HistoryImportModal(props: {
                                             setPreview(data);
                                             setStep("preview");
                                         } catch (e: any) {
-                                            toast.error(e?.message ?? "Preview failed");
+                                            toast.error(e?.message ?? t("historyImport.toastPreviewFailed"));
                                         } finally {
                                             setLoading(false);
                                         }
@@ -220,7 +220,7 @@ export default function HistoryImportModal(props: {
                                 className="px-4 py-2 text-sm rounded-md bg-accent-blue text-accent-blue-foreground hover:opacity-90 disabled:opacity-40 transition-all font-medium inline-flex items-center gap-2"
                             >
                                 {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-                                Preview
+                                {t("common.preview")}
                             </button>
                         </div>
                     </div>
@@ -228,36 +228,36 @@ export default function HistoryImportModal(props: {
                     <div className="mt-6 space-y-4">
                         <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
                             <div className="p-3 rounded-lg border border-border bg-background">
-                                <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Lignes</div>
+                                <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{t("historyImport.statsLines")}</div>
                                 <div className="text-sm font-semibold text-foreground mt-1">{preview?.total_lines ?? 0}</div>
                             </div>
                             <div className="p-3 rounded-lg border border-border bg-background">
-                                <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Analysées</div>
+                                <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{t("historyImport.statsParsed")}</div>
                                 <div className="text-sm font-semibold text-foreground mt-1">{preview?.parsed ?? 0}</div>
                             </div>
                             <div className="p-3 rounded-lg border border-border bg-background">
-                                <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Nouvelles</div>
+                                <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{t("historyImport.statsNew")}</div>
                                 <div className="text-sm font-semibold text-foreground mt-1">{preview?.created_candidates ?? 0}</div>
                             </div>
                             <div className="p-3 rounded-lg border border-border bg-background">
-                                <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Doublons</div>
+                                <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{t("historyImport.statsDuplicates")}</div>
                                 <div className="text-sm font-semibold text-foreground mt-1">{preview?.duplicate_candidates ?? 0}</div>
                             </div>
                             <div className="p-3 rounded-lg border border-border bg-background">
-                                <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Ignorées</div>
+                                <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{t("historyImport.statsIgnored")}</div>
                                 <div className="text-sm font-semibold text-foreground mt-1">{preview?.noise_candidates ?? 0}</div>
                             </div>
                         </div>
 
                         {preview?.truncated && (
                             <div className="text-xs text-muted-foreground">
-                                La liste est tronquée pour l’affichage, mais l’import utilise l’historique complet.
+                                {t("historyImport.previewTruncated")}
                             </div>
                         )}
 
                         <div className="border border-border rounded-lg overflow-hidden">
                             <div className="px-3 py-2 bg-background border-b border-border text-xs font-medium text-muted-foreground">
-                                Détail
+                                {t("historyImport.detail")}
                             </div>
                             <div className="max-h-[360px] overflow-y-auto divide-y divide-border">
                                 {(preview?.items ?? []).map((it, idx) => (
@@ -271,7 +271,7 @@ export default function HistoryImportModal(props: {
                                                         : "mt-0.5 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] border border-border bg-secondary text-muted-foreground"
                                             }
                                         >
-                                            {it.status === "new" ? "New" : it.status === "duplicate" ? "Duplicate" : "Ignored"}
+                                            {it.status === "new" ? t("historyImport.statusNew") : it.status === "duplicate" ? t("historyImport.statusDuplicate") : t("historyImport.statusIgnored")}
                                         </span>
                                         <div className="min-w-0 flex-1">
                                             <div className="font-mono text-sm text-foreground break-words">{it.command}</div>
@@ -294,7 +294,7 @@ export default function HistoryImportModal(props: {
                                 disabled={loading || importing}
                                 className="px-4 py-2 text-sm rounded-md hover:bg-surface-hover text-muted-foreground transition-colors disabled:opacity-50"
                             >
-                                Retour
+                                {t("common.back")}
                             </button>
                             <div className="flex items-center gap-2">
                                 <button
@@ -305,13 +305,13 @@ export default function HistoryImportModal(props: {
                                     disabled={loading || importing}
                                     className="px-4 py-2 text-sm rounded-md hover:bg-surface-hover text-muted-foreground transition-colors disabled:opacity-50"
                                 >
-                                    Annuler
+                                    {t("common.cancel")}
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => {
                                         if (importing || groupId == null || !preview) return;
-                                        const toastId = toast.loading("Importing...");
+                                        const toastId = toast.loading(t("common.importing"));
                                         void (async () => {
                                             try {
                                                 setImporting(true);
@@ -324,11 +324,11 @@ export default function HistoryImportModal(props: {
                                                         tags: parseTags(tagsText),
                                                     },
                                                 });
-                                                toast.success(`Imported ${res.created} command${res.created === 1 ? "" : "s"}`, { id: toastId });
+                                                toast.success(t("historyImport.toastImported", { count: res.created }), { id: toastId });
                                                 await onImported();
                                                 onClose();
                                             } catch (e: any) {
-                                                toast.error(e?.message ?? "Import failed", { id: toastId });
+                                                toast.error(e?.message ?? t("historyImport.toastImportFailed"), { id: toastId });
                                             } finally {
                                                 setImporting(false);
                                             }
@@ -338,7 +338,7 @@ export default function HistoryImportModal(props: {
                                     className="px-4 py-2 text-sm rounded-md bg-accent-blue text-accent-blue-foreground hover:opacity-90 disabled:opacity-40 transition-all font-medium inline-flex items-center gap-2"
                                 >
                                     {importing && <Loader2 className="w-4 h-4 animate-spin" />}
-                                    Importer {preview?.created_candidates ?? 0}
+                                    {t("historyImport.importButton", { count: preview?.created_candidates ?? 0 })}
                                 </button>
                             </div>
                         </div>

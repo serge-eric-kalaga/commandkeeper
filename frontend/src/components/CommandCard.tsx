@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Star, Copy, Check, Pencil, Trash2, ChevronDown, ChevronUp, Eye } from "lucide-react";
 import { Command } from "@/hooks/useCommandVault";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useTranslation } from "react-i18next";
 
 function escapeRegex(s: string) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -109,6 +110,7 @@ export default function CommandCard({
   selected,
   onSelectChange,
 }: Props) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const [justCopied, setJustCopied] = useState(false);
   const copiedTimeoutRef = useRef<number | null>(null);
@@ -129,7 +131,7 @@ export default function CommandCard({
             <Checkbox
               checked={!!selected}
               onCheckedChange={(v) => onSelectChange?.(Boolean(v))}
-              aria-label={selected ? "Deselect command" : "Select command"}
+              aria-label={selected ? t("commandCard.deselect") : t("commandCard.select")}
               className="mt-0.5"
             />
           )}
@@ -152,7 +154,7 @@ export default function CommandCard({
             className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground mt-1 transition-colors"
           >
             {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-            {expanded ? "Show less" : "Show more"}
+            {expanded ? t("commandCard.showLess") : t("commandCard.showMore")}
           </button>
         )}
       </div>
@@ -180,7 +182,7 @@ export default function CommandCard({
       {/* Footer */}
       <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
         <span className="text-[11px] text-muted-foreground">
-          Copied {cmd.copyCount} time{cmd.copyCount !== 1 ? "s" : ""}
+          {t("commandCard.copiedTimes", { count: cmd.copyCount })}
         </span>
         <div className="flex items-center gap-1">
           {onView && (
@@ -188,7 +190,7 @@ export default function CommandCard({
               onClick={() => onView(cmd)}
               className="flex items-center gap-1 px-2 py-1 text-xs rounded-md hover:bg-surface-hover text-muted-foreground hover:text-foreground transition-colors"
             >
-              <Eye className="w-3.5 h-3.5" /> View
+              <Eye className="w-3.5 h-3.5" /> {t("commandCard.view")}
             </button>
           )}
           <button
@@ -203,13 +205,13 @@ export default function CommandCard({
             }}
             className="flex items-center gap-1 px-2 py-1 text-xs rounded-md hover:bg-surface-hover text-muted-foreground hover:text-foreground transition-colors transition-transform active:scale-95"
           >
-            {justCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />} {justCopied ? "Copied" : "Copy"}
+            {justCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />} {justCopied ? t("commandCard.copied") : t("commandCard.copy")}
           </button>
           <button onClick={() => onEdit(cmd)} className="flex items-center gap-1 px-2 py-1 text-xs rounded-md hover:bg-surface-hover text-muted-foreground hover:text-foreground transition-colors">
-            <Pencil className="w-3.5 h-3.5" /> Edit
+            <Pencil className="w-3.5 h-3.5" /> {t("commandCard.edit")}
           </button>
           <button onClick={() => onDelete(cmd)} className="flex items-center gap-1 px-2 py-1 text-xs rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors">
-            <Trash2 className="w-3.5 h-3.5" /> Delete
+            <Trash2 className="w-3.5 h-3.5" /> {t("commandCard.delete")}
           </button>
         </div>
       </div>

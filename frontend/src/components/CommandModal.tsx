@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 
 interface Props {
   command?: Command | null;
@@ -28,6 +29,7 @@ function extractVars(text: string): string[] {
 }
 
 export default function CommandModal({ command, groups, defaultGroupId, open, onClose, onSave }: Props) {
+  const { t } = useTranslation();
   const [title, setTitle] = useState("");
   const [cmd, setCmd] = useState("");
   const [description, setDescription] = useState("");
@@ -95,15 +97,15 @@ export default function CommandModal({ command, groups, defaultGroupId, open, on
         >
           <X className="w-4 h-4" />
         </button>
-        <h2 className="text-lg font-semibold mb-4 text-card-foreground">{command ? "Edit Command" : "New Command"}</h2>
+        <h2 className="text-lg font-semibold mb-4 text-card-foreground">{command ? t("commandModal.editTitle") : t("commandModal.newTitle")}</h2>
 
         <div className="space-y-4">
           <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Title *</label>
-            <input value={title} onChange={(e) => setTitle(e.target.value)} className="w-full px-3 py-2 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent-blue" placeholder="Command title" />
+            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">{t("commandModal.titleLabel")}</label>
+            <input value={title} onChange={(e) => setTitle(e.target.value)} className="w-full px-3 py-2 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent-blue" placeholder={t("commandModal.titlePlaceholder")} />
           </div>
           <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Command *</label>
+            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">{t("commandModal.commandLabel")}</label>
             <textarea
               value={cmd}
               onChange={(e) => {
@@ -120,14 +122,16 @@ export default function CommandModal({ command, groups, defaultGroupId, open, on
               }}
               rows={3}
               className="w-full px-3 py-2 text-sm rounded-md border border-input bg-background text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-accent-blue resize-y"
-              placeholder="docker run -it {{image}}"
+              placeholder={t("commandModal.commandPlaceholder")}
             />
-            <p className="text-[11px] text-muted-foreground mt-1">Use {"{{variable_name}}"} for dynamic variables</p>
+            <p className="text-[11px] text-muted-foreground mt-1">
+              {t("commandModal.varsHint", { example: "{{variable_name}}" })}
+            </p>
           </div>
 
           {varsInCommand.length > 0 && (
             <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Default variables</label>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">{t("commandModal.defaultVariables")}</label>
               <div className="space-y-2">
                 {varsInCommand.map((v) => (
                   <div key={v} className="flex items-center gap-2">
@@ -141,15 +145,15 @@ export default function CommandModal({ command, groups, defaultGroupId, open, on
                   </div>
                 ))}
               </div>
-              <p className="text-[11px] text-muted-foreground mt-1">These values will pre-fill the copy dialog.</p>
+              <p className="text-[11px] text-muted-foreground mt-1">{t("commandModal.defaultsHint")}</p>
             </div>
           )}
           <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Description</label>
-            <input value={description} onChange={(e) => setDescription(e.target.value)} className="w-full px-3 py-2 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent-blue" placeholder="Optional description" />
+            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">{t("commandModal.descriptionLabel")}</label>
+            <input value={description} onChange={(e) => setDescription(e.target.value)} className="w-full px-3 py-2 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent-blue" placeholder={t("commandModal.descriptionPlaceholder")} />
           </div>
           <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Tags</label>
+            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">{t("commandModal.tagsLabel")}</label>
             <div className="flex flex-wrap gap-1.5 mb-2">
               {tags.map((tag) => (
                 <span key={tag} className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded-full bg-secondary text-secondary-foreground">
@@ -158,10 +162,10 @@ export default function CommandModal({ command, groups, defaultGroupId, open, on
                 </span>
               ))}
             </div>
-            <input value={tagInput} onChange={(e) => setTagInput(e.target.value)} onKeyDown={handleTagKey} className="w-full px-3 py-2 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent-blue" placeholder="Type tag and press Enter" />
+            <input value={tagInput} onChange={(e) => setTagInput(e.target.value)} onKeyDown={handleTagKey} className="w-full px-3 py-2 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent-blue" placeholder={t("commandModal.tagsPlaceholder")} />
           </div>
           <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Group</label>
+            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">{t("commandModal.groupLabel")}</label>
             <Popover open={groupOpen} onOpenChange={setGroupOpen}>
               <PopoverTrigger asChild>
                 <Button
@@ -172,16 +176,16 @@ export default function CommandModal({ command, groups, defaultGroupId, open, on
                   className="w-full justify-between h-auto px-3 py-2 text-sm rounded-md border border-input bg-background text-foreground hover:bg-background"
                 >
                   <span className={cn("truncate", !selectedGroup && "text-muted-foreground")}>
-                    {selectedGroup ? `${selectedGroup.icon} ${selectedGroup.name}` : "Select a group..."}
+                    {selectedGroup ? `${selectedGroup.icon} ${selectedGroup.name}` : t("commandModal.groupSelect")}
                   </span>
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
               <PopoverContent align="start" className="w-[--radix-popover-trigger-width] p-0">
                 <CommandListRoot>
-                  <CommandInput placeholder="Search groups..." />
+                  <CommandInput placeholder={t("commandModal.groupSearch")} />
                   <CommandList>
-                    <CommandEmpty>No group found.</CommandEmpty>
+                    <CommandEmpty>{t("commandModal.groupEmpty")}</CommandEmpty>
                     <CommandGroup>
                       {groups.map((g) => (
                         <CommandItem
@@ -214,7 +218,7 @@ export default function CommandModal({ command, groups, defaultGroupId, open, on
             disabled={saving}
             className="px-4 py-2 text-sm rounded-md hover:bg-surface-hover text-muted-foreground transition-colors disabled:opacity-50"
           >
-            Cancel
+            {t("common.cancel")}
           </button>
           <button
             onClick={async () => {
@@ -245,7 +249,7 @@ export default function CommandModal({ command, groups, defaultGroupId, open, on
             className="px-4 py-2 text-sm rounded-md bg-accent-blue text-accent-blue-foreground hover:opacity-90 disabled:opacity-40 transition-all font-medium inline-flex items-center gap-2"
           >
             {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-            {command ? "Save" : "Create"}
+            {command ? t("common.save") : t("common.create")}
           </button>
         </div>
       </div>

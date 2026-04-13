@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { X, AlertTriangle, Loader2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 interface Props {
   open: boolean;
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export default function DeleteModal({ open, title, onClose, onConfirm }: Props) {
+  const { t } = useTranslation();
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
@@ -38,9 +40,11 @@ export default function DeleteModal({ open, title, onClose, onConfirm }: Props) 
           <div className="p-2 rounded-full bg-destructive/10">
             <AlertTriangle className="w-5 h-5 text-destructive" />
           </div>
-          <h2 className="text-lg font-semibold text-card-foreground">Delete</h2>
+          <h2 className="text-lg font-semibold text-card-foreground">{t("deleteModal.title")}</h2>
         </div>
-        <p className="text-sm text-muted-foreground mb-6">Are you sure you want to delete <strong className="text-foreground">"{title}"</strong>? This action cannot be undone.</p>
+        <p className="text-sm text-muted-foreground mb-6">
+          {t("deleteModal.body", { title })}
+        </p>
         <div className="flex justify-end gap-2">
           <button
             onClick={() => {
@@ -49,7 +53,7 @@ export default function DeleteModal({ open, title, onClose, onConfirm }: Props) 
             disabled={deleting}
             className="px-4 py-2 text-sm rounded-md hover:bg-surface-hover text-muted-foreground transition-colors disabled:opacity-50"
           >
-            Cancel
+            {t("common.cancel")}
           </button>
           <button
             onClick={async () => {
@@ -68,7 +72,7 @@ export default function DeleteModal({ open, title, onClose, onConfirm }: Props) 
             className="px-4 py-2 text-sm rounded-md bg-destructive text-destructive-foreground hover:opacity-90 disabled:opacity-60 transition-all font-medium inline-flex items-center gap-2"
           >
             {deleting && <Loader2 className="w-4 h-4 animate-spin" />}
-            Delete
+            {t("deleteModal.confirm")}
           </button>
         </div>
       </div>

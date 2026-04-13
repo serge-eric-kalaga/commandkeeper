@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/command";
 import { Command } from "@/hooks/useCommandVault";
 import { toast } from "@/components/ui/sonner";
+import { useTranslation } from "react-i18next";
 
 type ParsedSearch = {
     text: string;
@@ -30,6 +31,7 @@ interface Props {
 }
 
 export default function CommandPalette({ open, onClose, groups, search, getTopCopied, onPick, parseAdvancedSearch }: Props) {
+    const { t } = useTranslation();
     const inputRef = useRef<HTMLInputElement | null>(null);
     const [query, setQuery] = useState("");
     const [loading, setLoading] = useState(false);
@@ -148,20 +150,20 @@ export default function CommandPalette({ open, onClose, groups, search, getTopCo
                         ref={inputRef}
                         value={query}
                         onValueChange={setQuery}
-                        placeholder="Search commands… (supports tag:, group:, fav:)"
+                        placeholder={t("palette.placeholder")}
                     />
 
                     <CommandList className="max-h-[360px]">
                         {(loading || topLoading) && (
                             <div className="px-3 py-2 text-xs text-muted-foreground flex items-center gap-2">
                                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                {hasQuery ? "Searching…" : "Loading…"}
+                                {hasQuery ? t("palette.searching") : t("palette.loading")}
                             </div>
                         )}
 
-                        <CommandEmpty>{hasQuery ? "No results." : "No commands yet."}</CommandEmpty>
+                        <CommandEmpty>{hasQuery ? t("palette.noResults") : t("palette.noCommands")}</CommandEmpty>
 
-                        <CommandGroup heading={hasQuery ? "Results" : "Top copied"}>
+                        <CommandGroup heading={hasQuery ? t("palette.results") : t("palette.topCopied")}>
                             {visibleItems.map((c) => (
                                 <CommandItem
                                     key={c.id}
@@ -170,7 +172,7 @@ export default function CommandPalette({ open, onClose, groups, search, getTopCo
                                         onPick(c);
                                         const hasVars = /\{\{\w+\}\}/.test(c.command);
                                         if (!hasVars) {
-                                            toast.success("Copied");
+                                            toast.success(t("palette.copiedToast"));
                                         }
                                         onClose();
                                     }}
@@ -186,8 +188,8 @@ export default function CommandPalette({ open, onClose, groups, search, getTopCo
                         </CommandGroup>
 
                         <div className="border-t border-border px-3 py-2 text-[11px] text-muted-foreground flex items-center justify-between">
-                            <span>Enter to copy</span>
-                            <span>Esc to close</span>
+                            <span>{t("palette.enterToCopy")}</span>
+                            <span>{t("palette.escToClose")}</span>
                         </div>
                     </CommandList>
                 </CommandRoot>

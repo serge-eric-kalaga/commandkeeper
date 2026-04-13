@@ -3,6 +3,7 @@ import { Loader2 } from "lucide-react";
 import { apiRequest } from "@/lib/apiClient";
 import { Command, Group, VaultData } from "@/hooks/useCommandVault";
 import { Button } from "@/components/ui/button";
+import i18next from "i18next";
 import {
     Dialog,
     DialogContent,
@@ -14,6 +15,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Trans, useTranslation } from "react-i18next";
 
 type ExportFormat = "json" | "csv" | "pdf";
 
@@ -241,13 +243,13 @@ async function exportToPdf(
 
     const drawHeader = () => {
         // Top title
-        drawText("Command Keeper", margin, y, bold, titleSize);
+        drawText(i18next.t("app.name"), margin, y, bold, titleSize);
         const dateStr = new Date().toISOString().slice(0, 10);
-        const right = `Export · ${dateStr}`;
+        const right = i18next.t("export.pdf.exportDate", { date: dateStr });
         const w = font.widthOfTextAtSize(right, fontSize);
         drawText(right, pageWidth - margin - w, y + 2, font, fontSize, colors.muted);
         y -= 18;
-        const subtitle = `${payload.commands.length} commands`;
+        const subtitle = i18next.t("export.pdf.commands", { count: payload.commands.length });
         drawText(subtitle, margin, y, font, fontSize, colors.muted);
         y -= 10;
         drawHr(y);
@@ -255,7 +257,7 @@ async function exportToPdf(
     };
 
     const drawFooter = () => {
-        const footer = `Page ${pageNumber}`;
+        const footer = i18next.t("export.pdf.page", { page: pageNumber });
         const w = font.widthOfTextAtSize(footer, smallSize);
         drawText(footer, pageWidth - margin - w, margin - 16, font, smallSize, colors.muted);
     };
@@ -280,9 +282,9 @@ async function exportToPdf(
         h += 16;
         // meta (up to 2 lines typically)
         const metaParts: string[] = [];
-        if (group) metaParts.push(`Group: ${group.name}`);
-        if (opts.fields.favorite) metaParts.push(cmd.isFavorite ? "Fav: yes" : "Fav: no");
-        if (opts.fields.copyCount) metaParts.push(`Copied: ${cmd.copyCount}`);
+        if (group) metaParts.push(i18next.t("export.pdf.group", { name: group.name }));
+        if (opts.fields.favorite) metaParts.push(i18next.t(cmd.isFavorite ? "export.pdf.favoriteYes" : "export.pdf.favoriteNo"));
+        if (opts.fields.copyCount) metaParts.push(i18next.t("export.pdf.copied", { n: cmd.copyCount }));
         if (metaParts.length > 0) {
             const meta = metaParts.join(" · ");
             const lines = wrap(meta, cardW - stripeW - cardPadding * 2, font, smallSize);
@@ -325,7 +327,7 @@ async function exportToPdf(
             const vars = Object.entries(cmd.defaultVariables)
                 .map(([k, v]) => `${k}=${v}`)
                 .join(" · ");
-            const varLines = wrap(`Variables: ${vars}`, cardW - stripeW - cardPadding * 2, font, smallSize);
+            const varLines = wrap(i18next.t("export.pdf.variables", { vars }), cardW - stripeW - cardPadding * 2, font, smallSize);
             h += varLines.length * 12;
         }
         return h;
@@ -365,9 +367,9 @@ async function exportToPdf(
         cursorY -= 16;
 
         const metaParts: string[] = [];
-        if (group) metaParts.push(`Group: ${group.name}`);
-        if (opts.fields.favorite) metaParts.push(cmd.isFavorite ? "Fav: yes" : "Fav: no");
-        if (opts.fields.copyCount) metaParts.push(`Copied: ${cmd.copyCount}`);
+        if (group) metaParts.push(i18next.t("export.pdf.group", { name: group.name }));
+        if (opts.fields.favorite) metaParts.push(i18next.t(cmd.isFavorite ? "export.pdf.favoriteYes" : "export.pdf.favoriteNo"));
+        if (opts.fields.copyCount) metaParts.push(i18next.t("export.pdf.copied", { n: cmd.copyCount }));
         if (metaParts.length > 0) {
             const meta = metaParts.join(" · ");
             const metaLines = wrap(meta, contentW, font, smallSize);
@@ -445,7 +447,7 @@ async function exportToPdf(
             const vars = Object.entries(cmd.defaultVariables)
                 .map(([k, v]) => `${k}=${v}`)
                 .join(" · ");
-            const varLines = wrap(`Variables: ${vars}`, contentW, font, smallSize);
+            const varLines = wrap(i18next.t("export.pdf.variables", { vars }), contentW, font, smallSize);
             for (const line of varLines) {
                 drawText(line, contentX, cursorY, font, smallSize, colors.muted);
                 cursorY -= 12;

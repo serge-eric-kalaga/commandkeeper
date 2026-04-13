@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import {
   Star, FolderOpen, Plus, Download, Upload, Sun, Moon, Menu, X, LogOut, Loader2, BarChart3,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Group, CommandStats } from "@/hooks/useCommandVault";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -37,6 +38,7 @@ export default function AppSidebar({
 }: SidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const { t, i18n } = useTranslation();
 
   const commandCount = (groupId: number) => stats.byGroup[groupId] ?? 0;
   const favCount = stats.favorites ?? 0;
@@ -72,7 +74,7 @@ export default function AppSidebar({
             }`}
         >
           <BarChart3 className="w-4 h-4" />
-          <span>Dashboard</span>
+          <span>{t("sidebar.dashboard")}</span>
         </button>
 
         <button
@@ -82,7 +84,7 @@ export default function AppSidebar({
             }`}
         >
           <FolderOpen className="w-4 h-4" />
-          <span>All Commands</span>
+          <span>{t("sidebar.allCommands")}</span>
           <span className="ml-auto text-xs text-sidebar-muted">
             {loading ? <Skeleton className="h-3 w-6" /> : (stats.total ?? 0)}
           </span>
@@ -95,7 +97,7 @@ export default function AppSidebar({
             }`}
         >
           <Star className="w-4 h-4" />
-          <span>Favorites</span>
+          <span>{t("sidebar.favorites")}</span>
           <span className="ml-auto text-xs text-sidebar-muted">
             {loading ? <Skeleton className="h-3 w-6" /> : favCount}
           </span>
@@ -104,7 +106,7 @@ export default function AppSidebar({
         {/* Groups */}
         <div className="pt-4">
           <div className="flex items-center justify-between px-3 mb-2">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-sidebar-muted">Groups</span>
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-sidebar-muted">{t("sidebar.groups")}</span>
             <button onClick={onNewGroup} disabled={loading} className="p-0.5 rounded hover:bg-surface-hover text-sidebar-muted transition-colors disabled:opacity-50">
               <Plus className="w-3.5 h-3.5" />
             </button>
@@ -148,7 +150,7 @@ export default function AppSidebar({
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              title="Import/Export"
+              title={t("sidebar.importExport")}
               className="p-2 rounded-md hover:bg-surface-hover text-sidebar-muted transition-colors"
             >
               {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
@@ -161,7 +163,7 @@ export default function AppSidebar({
               className="gap-2"
             >
               <Upload className="w-4 h-4" />
-              Importer
+              {t("sidebar.import")}
             </DropdownMenuItem>
             <DropdownMenuItem
               onSelect={onImportHistory}
@@ -169,21 +171,34 @@ export default function AppSidebar({
               className="gap-2"
             >
               <Upload className="w-4 h-4" />
-              Importer historique
+              {t("sidebar.importHistory")}
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={onExport} className="gap-2">
               <Download className="w-4 h-4" />
-              Exporter
+              {t("sidebar.export")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        <button
+          type="button"
+          onClick={() => {
+            const next = i18n.language === "fr" ? "en" : "fr";
+            void i18n.changeLanguage(next);
+          }}
+          title={t("language.switch")}
+          className="p-2 rounded-md hover:bg-surface-hover text-sidebar-muted transition-colors"
+        >
+          <span className="text-[11px] font-semibold tracking-wide">
+            {(i18n.language === "fr" ? "FR" : "EN")}
+          </span>
+        </button>
         <div className="flex-1" />
         <button
           onClick={() => {
             onLogout();
             setMobileOpen(false);
           }}
-          title="Logout"
+          title={t("sidebar.logout")}
           className="p-2 rounded-md hover:bg-surface-hover text-sidebar-muted transition-colors"
         >
           <LogOut className="w-4 h-4" />
