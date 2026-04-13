@@ -11,6 +11,7 @@ import GroupModal from "@/components/GroupModal";
 import CommandModal from "@/components/CommandModal";
 import CommandViewModal from "@/components/CommandViewModal";
 import CommandPalette from "@/components/CommandPalette";
+import HelpModal from "@/components/HelpModal";
 import ExportModal from "@/components/ExportModal";
 import VariableModal from "@/components/VariableModal";
 import DeleteModal from "@/components/DeleteModal";
@@ -154,6 +155,7 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
   const [editCmd, setEditCmd] = useState<Command | null>(null);
   const [viewCmd, setViewCmd] = useState<Command | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [exportModal, setExportModal] = useState(false);
   const [exportSelection, setExportSelection] = useState<Command[] | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ type: "command" | "group"; id: number; title: string } | null>(null);
@@ -187,6 +189,7 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
       }
       if (e.key === "Escape") {
         setPaletteOpen(false);
+        setHelpOpen(false);
         setGroupModal(false);
         setCmdModal(false);
         setViewCmd(null);
@@ -644,6 +647,15 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
                   >
                     <Plus className="w-4 h-4" /> Add Command
                   </button>
+
+                  <button
+                    onClick={() => setHelpOpen(true)}
+                    disabled={vault.loading}
+                    className="inline-flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-md border border-input bg-background text-muted-foreground hover:text-foreground hover:bg-surface-hover disabled:opacity-50 transition-colors"
+                    title="Aide"
+                  >
+                    Aide
+                  </button>
                 </div>
 
                 <div className="mt-1 text-[11px] text-muted-foreground pl-9">
@@ -684,6 +696,16 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
                   ) : (
                     <span>Unable to load stats</span>
                   )}
+                </div>
+
+                <div className="flex items-end justify-end">
+                  <button
+                    onClick={() => setHelpOpen(true)}
+                    className="inline-flex items-center justify-center px-3 py-2 text-sm rounded-md border border-input bg-background text-muted-foreground hover:text-foreground hover:bg-surface-hover transition-colors"
+                    title="Aide"
+                  >
+                    Aide
+                  </button>
                 </div>
               </div>
             )}
@@ -971,6 +993,11 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
         getTopCopied={vault.getTopCopied}
         onPick={handleCopy}
         parseAdvancedSearch={parseAdvancedSearch}
+      />
+
+      <HelpModal
+        open={helpOpen}
+        onClose={() => setHelpOpen(false)}
       />
 
       <VariableModal
