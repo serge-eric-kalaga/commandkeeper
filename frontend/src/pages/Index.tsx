@@ -10,6 +10,7 @@ import CommandCard from "@/components/CommandCard";
 import GroupModal from "@/components/GroupModal";
 import CommandModal from "@/components/CommandModal";
 import CommandViewModal from "@/components/CommandViewModal";
+import CommandPalette from "@/components/CommandPalette";
 import ExportModal from "@/components/ExportModal";
 import VariableModal from "@/components/VariableModal";
 import DeleteModal from "@/components/DeleteModal";
@@ -152,6 +153,7 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
   const [cmdModal, setCmdModal] = useState(false);
   const [editCmd, setEditCmd] = useState<Command | null>(null);
   const [viewCmd, setViewCmd] = useState<Command | null>(null);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const [exportModal, setExportModal] = useState(false);
   const [exportSelection, setExportSelection] = useState<Command[] | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ type: "command" | "group"; id: number; title: string } | null>(null);
@@ -174,11 +176,17 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "p") {
+        e.preventDefault();
+        setPaletteOpen(true);
+        return;
+      }
       if ((e.ctrlKey || e.metaKey) && e.key === "k") {
         e.preventDefault();
         document.getElementById("vault-search")?.focus();
       }
       if (e.key === "Escape") {
+        setPaletteOpen(false);
         setGroupModal(false);
         setCmdModal(false);
         setViewCmd(null);
@@ -953,6 +961,16 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
         command={viewCmd}
         onClose={() => setViewCmd(null)}
         onCopy={handleCopy}
+      />
+
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        groups={vault.data.groups}
+        search={vault.searchCommands}
+        getTopCopied={vault.getTopCopied}
+        onPick={handleCopy}
+        parseAdvancedSearch={parseAdvancedSearch}
       />
 
       <VariableModal

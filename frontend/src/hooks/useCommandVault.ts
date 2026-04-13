@@ -479,6 +479,14 @@ export function useCommandVault(token: string) {
     return res.items.map(mapCommand);
   }, [token]);
 
+  const getTopCopied = useCallback(async (limit = 10) => {
+    const res = await apiRequest<ApiCommand[]>("/commands/top-copied", {
+      token,
+      query: { limit },
+    });
+    return res.map(mapCommand);
+  }, [token]);
+
   return {
     data,
     loading,
@@ -495,6 +503,7 @@ export function useCommandVault(token: string) {
     importData, exportData, persist,
     reload,
     searchCommands,
+    getTopCopied,
     setCommandsView: setCommandsViewAndReload,
     loadMoreCommands,
   };

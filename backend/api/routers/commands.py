@@ -135,6 +135,20 @@ def command_stats(db: Session = Depends(get_db)) -> CommandStatsResponse:
     return CommandStatsResponse(total=total, favorites=favorites, by_group=by_group)
 
 
+@router.get("/top-copied", response_model=list[CommandOut])
+def top_copied_commands(
+    limit: int = Query(default=10, ge=1, le=50),
+    db: Session = Depends(get_db),
+) -> list[CommandOut]:
+    stmt = (
+        select(Command)
+        .options(selectinload(Command.tag_entities))
+        .order_by(Command.copy_count.desc(), Command.updated_at.desc())
+        .limit(limit)
+    )
+    return list(db.scalars(stmt).all())
+
+
 @router.post("", response_model=CommandOut, status_code=status.HTTP_201_CREATED)
 def create_command(payload: CommandCreate, db: Session = Depends(get_db)) -> CommandOut:
     group = db.get(Group, payload.group_id)

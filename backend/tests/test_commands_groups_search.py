@@ -299,3 +299,83 @@ def test_bulk_import_creates_groups_commands_and_tags(client):
     cmds_b = res.json()
     assert len(cmds_b) == 1
     assert cmds_b[0]["title"] == "Cmd 2"
+
+
+def test_top_copied_commands_returns_sorted_by_copy_count(client):
+    login = _login(client, "admin", "admin")
+    token = login["access_token"]
+
+    res = client.post(
+        "/auth/change-password",
+        json={"old_password": "admin", "new_password": "admin123"},
+        headers=_auth_headers(token),
+    )
+    assert res.status_code == 200
+
+    login2 = _login(client, "admin", "admin123")
+    token2 = login2["access_token"]
+
+    res = client.post(
+        "/groups", json={"name": "Projet A"}, headers=_auth_headers(token2)
+    )
+    assert res.status_code == 201
+    group = res.json()
+
+    res = client.post(
+        "/commands",
+        json={
+            "group_id": group["id"],
+            "title": "C1",
+            "command": "echo 1",
+            "tags": [],
+            "copy_count": 2,
+        },
+        headers=_auth_headers(token2),
+    )
+    assert res.status_code == 201
+    c1 = res.json()
+
+    res = client.post(
+        "/commands",
+        json={
+            "group_id": group["id"],
+            "title": "C2",
+            "command": "echo 2",
+            "tags": [],
+            "copy_count": 5,
+        },
+        headers=_auth_headers(token2),
+    )
+    assert res.status_code == 201
+    c2 = res.json()
+
+    res = client.post(
+        "/commands",
+        json={
+            "group_id": group["id"],
+            "title": "C3",
+            "command": "echo 3",
+            "tags": [],
+            "copy_count": 1,
+        },
+        headers=_auth_headers(token2),
+    )
+    assert res.status_code == 201
+    c3 = res.json()
+
+    res = client.get(
+        "/commands/top-copied",
+        params={"limit": 10},
+        headers=_auth_headers(token2),
+    )
+    assert res.status_code == 200
+    items = res.json()
+
+    ids = [item["id"] for item in items]
+    assert c2["id"] in ids
+    assert c1["id"] in ids
+    assert c3["id"] in ids
+
+    # Ensure sorted by copy_count desc for these three
+    top_three = [item for item in items if item["id"] in {c1["id"], c2["id"], c3["id"]}]
+    assert [item["id"] for item in top_three][:3] == [c2["id"], c1["id"], c3["id"]]
