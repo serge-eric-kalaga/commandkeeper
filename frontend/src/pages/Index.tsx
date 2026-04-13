@@ -108,6 +108,8 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
   const [tagsExpanded, setTagsExpanded] = useState(false);
   const [tagsOverflow, setTagsOverflow] = useState(false);
   const tagsContainerRef = useRef<HTMLDivElement | null>(null);
+  const skipNextCommandsViewEffectRef = useRef(false);
+  const hasInitializedCommandsViewRef = useRef(false);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const [layout, setLayout] = useState<"vertical" | "horizontal">(() => {
     if (typeof window === "undefined") return "vertical";
@@ -230,10 +232,10 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
   // This is used to keep the tag list stable when selecting multiple tags.
   const baseCommands = useMemo(() => {
     const isServerSearch = search.trim().length > 0;
-    const cmds = isServerSearch ? [...(searchResults ?? [])] : [...vault.data.commands];
+    if (isServerSearch) return searchResults ?? [];
     // vault.data.commands is already loaded for the current view.
-    return cmds;
-  }, [vault.data.commands, activeView, search, searchResults]);
+    return vault.data.commands;
+  }, [vault.data.commands, search, searchResults]);
 
   const selectedCount = selectedIds.size;
   const selectedCommands = useMemo(() => {
@@ -252,27 +254,31 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
     });
   }, []);
 
-  // Filtered commands (applies tag filters + sorting)
-  const filteredCommands = useMemo(() => {
-    let cmds = [...baseCommands];
-
-    if (tagFilters.length > 0) {
-      cmds = cmds.filter((c) => tagFilters.some((t) => c.tags.includes(t)));
-    }
-
-    if (sortMode === "mostCopied") {
-      cmds.sort((a, b) => {
-        if (b.copyCount !== a.copyCount) return b.copyCount - a.copyCount;
-        return Date.parse(b.updatedAt) - Date.parse(a.updatedAt);
-      });
-    }
-
-    return cmds;
-  }, [baseCommands, tagFilters, sortMode]);
-
   const toggleTagFilter = useCallback((tag: string) => {
     setTagFilters((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]));
   }, []);
+
+  // Server-side paging view: reload when sort/tags change (but not while searching).
+  useEffect(() => {
+    if (!hasInitializedCommandsViewRef.current) {
+      hasInitializedCommandsViewRef.current = true;
+      return;
+    }
+    if (skipNextCommandsViewEffectRef.current) {
+      skipNextCommandsViewEffectRef.current = false;
+      return;
+    }
+    if (activeView === "dashboard") return;
+    if (search.trim().length > 0) return;
+
+    void setCommandsView({
+      ...viewToOptions(activeView),
+      tags: tagFilters,
+      sort: sortMode,
+    }).catch(() => {
+      // ignore
+    });
+  }, [activeView, search, setCommandsView, sortMode, tagFilters.join("|"), viewToOptions]);
 
   // Server-side search
   useEffect(() => {
@@ -310,14 +316,14 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
     }
 
     const isFavorite = parsed.isFavorite ?? defaultFavorite;
-    const tags = parsed.tags;
+    const tags = Array.from(new Set([...(parsed.tags ?? []), ...(tagFilters ?? [])]));
 
     setSearchLoading(true);
     setSearchResults(null);
 
     const timeoutId = window.setTimeout(() => {
       void vault
-        .searchCommands(parsed.text, { groupId, limit: 200, tags, isFavorite, signal: controller.signal })
+        .searchCommands(parsed.text, { groupId, limit: 200, tags, isFavorite, sort: sortMode, signal: controller.signal })
         .then((items) => {
           if (cancelled) return;
           setSearchResults(items);
@@ -338,7 +344,7 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
       controller.abort();
       window.clearTimeout(timeoutId);
     };
-  }, [search, activeView, vault.searchCommands, vault.data.groups]);
+  }, [search, activeView, sortMode, tagFilters.join("|"), vault.searchCommands, vault.data.groups]);
 
   // Current group
   const currentGroup = activeView.startsWith("group:")
@@ -403,12 +409,8 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
     return { groupId, favoritesOnly, tags, q };
   }, [activeView, search, tagFilters, viewToOptions, vault.data.groups]);
 
-  // All tags for filter (from baseCommands so tags don't disappear when filtering)
-  const allTags = useMemo(() => {
-    const tags = new Set<string>();
-    baseCommands.forEach((c) => c.tags.forEach((t) => tags.add(t)));
-    return [...tags].sort();
-  }, [baseCommands]);
+  // All tags for filter (global list, independent of paging)
+  const allTags = useMemo(() => vault.tags ?? [], [vault.tags]);
 
   useEffect(() => {
     const el = tagsContainerRef.current;
@@ -505,7 +507,12 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
           setSearchLoading(false);
           setTagFilters([]);
           setTagsExpanded(false);
-          void setCommandsView(viewToOptions(v)).catch(() => {
+          skipNextCommandsViewEffectRef.current = true;
+          void setCommandsView({
+            ...viewToOptions(v),
+            tags: [],
+            sort: sortMode,
+          }).catch(() => {
             // ignore
           });
         }}
@@ -814,9 +821,9 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
                 </div>
               ))}
             </div>
-          ) : filteredCommands.length > 0 ? (
+          ) : baseCommands.length > 0 ? (
             <div className={`grid gap-3 ${layout === "horizontal" ? "sm:grid-cols-2" : "grid-cols-1"}`}>
-              {filteredCommands.map((cmd) => (
+              {baseCommands.map((cmd) => (
                 <CommandCard
                   key={cmd.id}
                   cmd={cmd}

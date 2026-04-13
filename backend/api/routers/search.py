@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from typing import Literal
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import and_, case, func, literal, or_, select
@@ -22,6 +23,7 @@ def search_commands(
     group_id: int | None = Query(default=None),
     is_favorite: bool | None = Query(default=None),
     tag: list[str] | None = Query(default=None),
+    sort: Literal["recent", "mostCopied"] = Query(default="recent"),
     limit: int = Query(default=20, ge=1, le=200),
     db: Session = Depends(get_db),
 ) -> SearchResponse:
@@ -79,11 +81,17 @@ def search_commands(
     for match_expr in token_matches:
         score = score + case((match_expr, 1), else_=0)
 
+    if sort == "mostCopied":
+        # Keep relevance first, then copies.
+        order_by = (score.desc(), Command.copy_count.desc(), Command.updated_at.desc(), Command.id.desc())
+    else:
+        order_by = (score.desc(), Command.updated_at.desc(), Command.id.desc())
+
     stmt = (
         select(Command, score.label("score"))
         .options(selectinload(Command.tag_entities))
         .where(where_clause)
-        .order_by(score.desc(), Command.updated_at.desc())
+        .order_by(*order_by)
         .limit(limit)
     )
 

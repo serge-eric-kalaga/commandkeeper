@@ -71,6 +71,8 @@ type ApiCommandsPageResponse = {
   offset: number;
 };
 
+type SortMode = "recent" | "mostCopied";
+
 type ApiCommandStatsResponse = {
   total: number;
   favorites: number;
@@ -138,13 +140,20 @@ export function useCommandVault(token: string) {
 
   const [stats, setStats] = useState<CommandStats>({ total: 0, favorites: 0, byGroup: {} });
 
+  const [tags, setTags] = useState<string[]>([]);
+
   const [commandsLoading, setCommandsLoading] = useState(false);
   const [commandsLoadingMore, setCommandsLoadingMore] = useState(false);
   const [commandsHasMore, setCommandsHasMore] = useState(false);
   const [commandsTotal, setCommandsTotal] = useState(0);
   const [commandsOffset, setCommandsOffset] = useState(0);
   const commandsLimit = 30;
-  const [commandsView, setCommandsView] = useState<{ groupId?: number; favoritesOnly?: boolean }>({});
+  const [commandsView, setCommandsView] = useState<{ groupId?: number; favoritesOnly?: boolean; tags?: string[]; sort?: SortMode }>({ sort: "recent" });
+
+  const fetchTags = useCallback(async () => {
+    const res = await apiRequest<string[]>("/tags", { token });
+    setTags(Array.isArray(res) ? res : []);
+  }, [token]);
 
   const fetchStats = useCallback(async () => {
     const res = await apiRequest<ApiCommandStatsResponse>("/commands/stats", { token });
@@ -156,12 +165,14 @@ export function useCommandVault(token: string) {
     setStats({ total: res.total ?? 0, favorites: res.favorites ?? 0, byGroup });
   }, [token]);
 
-  const fetchCommandsPage = useCallback(async (opts: { groupId?: number; favoritesOnly?: boolean; limit: number; offset: number }) => {
+  const fetchCommandsPage = useCallback(async (opts: { groupId?: number; favoritesOnly?: boolean; tags?: string[]; sort?: SortMode; limit: number; offset: number }) => {
     const res = await apiRequest<ApiCommandsPageResponse>("/commands/paged", {
       token,
       query: {
         group_id: opts.groupId,
         is_favorite: opts.favoritesOnly ? true : undefined,
+        tag: opts.tags,
+        sort: opts.sort,
         limit: opts.limit,
         offset: opts.offset,
       },
@@ -175,7 +186,7 @@ export function useCommandVault(token: string) {
     };
   }, [token]);
 
-  const loadInitialCommands = useCallback(async (view: { groupId?: number; favoritesOnly?: boolean }) => {
+  const loadInitialCommands = useCallback(async (view: { groupId?: number; favoritesOnly?: boolean; tags?: string[]; sort?: SortMode }) => {
     setCommandsLoading(true);
     setCommandsView(view);
     try {
@@ -225,10 +236,11 @@ export function useCommandVault(token: string) {
     setData((prev) => ({ ...prev, groups: groups.map(mapGroup) }));
     await Promise.all([
       fetchStats(),
+      fetchTags(),
       loadInitialCommands(commandsView),
     ]);
     setLoading(false);
-  }, [commandsView, fetchStats, loadInitialCommands, token]);
+  }, [commandsView, fetchStats, fetchTags, loadInitialCommands, token]);
 
   useEffect(() => {
     let cancelled = false;
@@ -242,6 +254,7 @@ export function useCommandVault(token: string) {
 
         await Promise.all([
           fetchStats(),
+          fetchTags(),
           loadInitialCommands({}),
         ]);
 
@@ -257,14 +270,14 @@ export function useCommandVault(token: string) {
     return () => {
       cancelled = true;
     };
-  }, [fetchStats, loadInitialCommands, token]);
+  }, [fetchStats, fetchTags, loadInitialCommands, token]);
 
   const persist = useCallback((next: VaultData) => {
     // Backend is the source of truth; keep this for compatibility.
     setData(next);
   }, []);
 
-  const setCommandsViewAndReload = useCallback(async (view: { groupId?: number; favoritesOnly?: boolean }) => {
+  const setCommandsViewAndReload = useCallback(async (view: { groupId?: number; favoritesOnly?: boolean; tags?: string[]; sort?: SortMode }) => {
     await loadInitialCommands(view);
   }, [loadInitialCommands]);
 
@@ -286,7 +299,8 @@ export function useCommandVault(token: string) {
       groups: [...prev.groups, mapped].sort((a, b) => a.name.localeCompare(b.name)),
     }));
     await fetchStats();
-  }, [fetchStats, token]);
+    await fetchTags();
+  }, [fetchStats, fetchTags, token]);
 
   const updateGroup = useCallback(async (id: number, updates: Partial<Group>) => {
     const updated = await apiRequest<ApiGroup>(`/groups/${id}`, {
@@ -313,7 +327,8 @@ export function useCommandVault(token: string) {
       commands: prev.commands.filter((c) => c.groupId !== id),
     }));
     await fetchStats();
-  }, [fetchStats, token]);
+    await fetchTags();
+  }, [fetchStats, fetchTags, token]);
 
   // Commands
   const addCommand = useCallback(async (c: Omit<Command, "id" | "createdAt" | "updatedAt">) => {
@@ -339,7 +354,8 @@ export function useCommandVault(token: string) {
       return { ...prev, commands: [mapped, ...prev.commands] };
     });
     await fetchStats();
-  }, [commandsView.favoritesOnly, commandsView.groupId, fetchStats, token]);
+    await fetchTags();
+  }, [commandsView.favoritesOnly, commandsView.groupId, fetchStats, fetchTags, token]);
 
   const updateCommand = useCallback(async (id: number, updates: Partial<Command>) => {
     const updated = await apiRequest<ApiCommand>(`/commands/${id}`, {
@@ -376,13 +392,15 @@ export function useCommandVault(token: string) {
       return { ...prev, commands: prev.commands.map((c) => (c.id === id ? mapped : c)) };
     });
     await fetchStats();
-  }, [commandsView.favoritesOnly, commandsView.groupId, fetchStats, token]);
+    await fetchTags();
+  }, [commandsView.favoritesOnly, commandsView.groupId, fetchStats, fetchTags, token]);
 
   const deleteCommand = useCallback(async (id: number) => {
     await apiRequest(`/commands/${id}`, { method: "DELETE", token });
     setData((prev) => ({ ...prev, commands: prev.commands.filter((c) => c.id !== id) }));
     await fetchStats();
-  }, [fetchStats, token]);
+    await fetchTags();
+  }, [fetchStats, fetchTags, token]);
 
   const toggleFavorite = useCallback(async (id: number) => {
     const current = data.commands.find((c) => c.id === id);
@@ -462,7 +480,7 @@ export function useCommandVault(token: string) {
 
   const searchCommands = useCallback(async (
     q: string,
-    options?: { groupId?: number; limit?: number; tags?: string[]; isFavorite?: boolean; signal?: AbortSignal }
+    options?: { groupId?: number; limit?: number; tags?: string[]; isFavorite?: boolean; sort?: SortMode; signal?: AbortSignal }
   ) => {
     const res = await apiRequest<ApiSearchResponse>("/search", {
       token,
@@ -472,6 +490,7 @@ export function useCommandVault(token: string) {
         group_id: options?.groupId,
         is_favorite: options?.isFavorite,
         tag: options?.tags,
+        sort: options?.sort,
         limit: options?.limit ?? 200,
       },
     });
@@ -494,6 +513,7 @@ export function useCommandVault(token: string) {
     commandsLoadingMore,
     commandsHasMore,
     commandsTotal,
+    tags,
     stats,
     importing,
     error,

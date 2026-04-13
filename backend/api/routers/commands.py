@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
@@ -76,6 +78,7 @@ def list_commands_paged(
     is_favorite: bool | None = Query(default=None),
     q: str | None = Query(default=None),
     tag: list[str] | None = Query(default=None),
+    sort: Literal["recent", "mostCopied"] = Query(default="recent"),
     limit: int = Query(default=20, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
@@ -107,10 +110,16 @@ def list_commands_paged(
         total_stmt = total_stmt.where(*where)
     total = int(db.scalar(total_stmt) or 0)
 
+    if sort == "mostCopied":
+        order_by = (Command.copy_count.desc(), Command.updated_at.desc(), Command.id.desc())
+    else:
+        # recent
+        order_by = (Command.updated_at.desc(), Command.id.desc())
+
     stmt = (
         select(Command)
         .options(selectinload(Command.tag_entities))
-        .order_by(Command.updated_at.desc())
+        .order_by(*order_by)
         .limit(limit)
         .offset(offset)
     )
