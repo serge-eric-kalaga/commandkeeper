@@ -21,6 +21,7 @@ interface SidebarProps {
   onNewGroup: () => void;
   onExport: () => void;
   onImport: (file: File) => void;
+  onImportHistory: () => void;
   onLogout: () => void;
   dark: boolean;
   onToggleTheme: () => void;
@@ -32,7 +33,7 @@ export default function AppSidebar({
   groups, stats, activeView, onViewChange, onNewGroup,
   loading = false,
   importing = false,
-  onExport, onImport, onLogout, dark, onToggleTheme, onEditGroup, onDeleteGroup,
+  onExport, onImport, onImportHistory, onLogout, dark, onToggleTheme, onEditGroup, onDeleteGroup,
 }: SidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -161,6 +162,14 @@ export default function AppSidebar({
             >
               <Upload className="w-4 h-4" />
               Importer
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={onImportHistory}
+              disabled={loading || importing}
+              className="gap-2"
+            >
+              <Upload className="w-4 h-4" />
+              Importer historique
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={onExport} className="gap-2">
               <Download className="w-4 h-4" />

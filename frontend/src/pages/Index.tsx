@@ -12,6 +12,7 @@ import CommandModal from "@/components/CommandModal";
 import CommandViewModal from "@/components/CommandViewModal";
 import CommandPalette from "@/components/CommandPalette";
 import HelpModal from "@/components/HelpModal";
+import HistoryImportModal from "@/components/HistoryImportModal";
 import ExportModal from "@/components/ExportModal";
 import VariableModal from "@/components/VariableModal";
 import DeleteModal from "@/components/DeleteModal";
@@ -156,6 +157,7 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
   const [viewCmd, setViewCmd] = useState<Command | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [historyImportOpen, setHistoryImportOpen] = useState(false);
   const [exportModal, setExportModal] = useState(false);
   const [exportSelection, setExportSelection] = useState<Command[] | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ type: "command" | "group"; id: number; title: string } | null>(null);
@@ -190,6 +192,7 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
       if (e.key === "Escape") {
         setPaletteOpen(false);
         setHelpOpen(false);
+        setHistoryImportOpen(false);
         setGroupModal(false);
         setCmdModal(false);
         setViewCmd(null);
@@ -510,6 +513,13 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
           setExportModal(true);
         }}
         onImport={handleImport}
+        onImportHistory={() => {
+          if (vault.data.groups.length === 0) {
+            toast.info("Create a group first");
+            return;
+          }
+          setHistoryImportOpen(true);
+        }}
         onLogout={onLogout}
         dark={theme.dark}
         onToggleTheme={theme.toggle}
@@ -998,6 +1008,16 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
       <HelpModal
         open={helpOpen}
         onClose={() => setHelpOpen(false)}
+      />
+
+      <HistoryImportModal
+        open={historyImportOpen}
+        token={token}
+        groups={vault.data.groups}
+        onClose={() => setHistoryImportOpen(false)}
+        onImported={async () => {
+          await vault.reload();
+        }}
       />
 
       <VariableModal

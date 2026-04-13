@@ -121,6 +121,9 @@ export default function HelpModal({ open, onClose }: Props) {
                                 Export (JSON/CSV/PDF) et import JSON sont accessibles depuis la sidebar.
                                 Tu peux aussi exporter une sélection via la barre d’actions.
                             </p>
+                            <p>
+                                Tu peux aussi importer ton <strong className="text-foreground">historique shell</strong> (bash/zsh) via “Importer historique”.
+                            </p>
                         </div>
                     </section>
 

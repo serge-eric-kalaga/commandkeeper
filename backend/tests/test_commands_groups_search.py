@@ -379,3 +379,82 @@ def test_top_copied_commands_returns_sorted_by_copy_count(client):
     # Ensure sorted by copy_count desc for these three
     top_three = [item for item in items if item["id"] in {c1["id"], c2["id"], c3["id"]}]
     assert [item["id"] for item in top_three][:3] == [c2["id"], c1["id"], c3["id"]]
+
+
+def test_import_history_preview_and_import_creates_only_new_commands(client):
+    login = _login(client, "admin", "admin")
+    token = login["access_token"]
+
+    res = client.post(
+        "/auth/change-password",
+        json={"old_password": "admin", "new_password": "admin123"},
+        headers=_auth_headers(token),
+    )
+    assert res.status_code == 200
+
+    login2 = _login(client, "admin", "admin123")
+    token2 = login2["access_token"]
+
+    res = client.post(
+        "/groups", json={"name": "Projet A"}, headers=_auth_headers(token2)
+    )
+    assert res.status_code == 201
+    group = res.json()
+
+    # Existing command in DB (should be treated as duplicate)
+    res = client.post(
+        "/commands",
+        json={
+            "group_id": group["id"],
+            "title": "Docker list",
+            "command": "docker ps -a",
+            "tags": [],
+        },
+        headers=_auth_headers(token2),
+    )
+    assert res.status_code == 201
+
+    history = "\n".join(
+        [
+            "cd /tmp",
+            "ls -la",
+            ": 1712345678:0;docker ps -a",
+            "docker ps -a",
+            "docker system prune -af",
+            "echo hello",
+        ]
+    )
+
+    res = client.post(
+        "/import/history/preview",
+        json={"group_id": group["id"], "history": history, "tags": ["devops"]},
+        headers=_auth_headers(token2),
+    )
+    assert res.status_code == 200
+    body = res.json()
+    assert body["total_lines"] == 6
+    assert body["parsed"] == 6
+    assert body["created_candidates"] == 2
+    assert body["duplicate_candidates"] == 2
+    assert body["noise_candidates"] == 2
+
+    res = client.post(
+        "/import/history",
+        json={"group_id": group["id"], "history": history, "tags": ["devops"]},
+        headers=_auth_headers(token2),
+    )
+    assert res.status_code == 200
+    body2 = res.json()
+    assert body2["created"] == 2
+    assert body2["skipped_duplicates"] == 2
+    assert body2["skipped_noise"] == 2
+
+    res = client.get(
+        "/commands", params={"group_id": group["id"]}, headers=_auth_headers(token2)
+    )
+    assert res.status_code == 200
+    cmds = res.json()
+    assert len(cmds) == 3
+    created_commands = {c["command"] for c in cmds}
+    assert "docker system prune -af" in created_commands
+    assert "echo hello" in created_commands
