@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Star, Copy, Check, Pencil, Trash2, ChevronDown, ChevronUp } from "lucide-react";
+import { Star, Copy, Check, Pencil, Trash2, ChevronDown, ChevronUp, Eye } from "lucide-react";
 import { Command } from "@/hooks/useCommandVault";
 import { Checkbox } from "@/components/ui/checkbox";
 
@@ -83,6 +83,7 @@ interface Props {
   cmd: Command;
   groupColor?: string;
   onCopy: (cmd: Command) => void;
+  onView?: (cmd: Command) => void;
   onEdit: (cmd: Command) => void;
   onDelete: (cmd: Command) => void;
   onToggleFavorite: (id: number) => void;
@@ -98,6 +99,7 @@ export default function CommandCard({
   cmd,
   groupColor,
   onCopy,
+  onView,
   onEdit,
   onDelete,
   onToggleFavorite,
@@ -181,6 +183,14 @@ export default function CommandCard({
           Copied {cmd.copyCount} time{cmd.copyCount !== 1 ? "s" : ""}
         </span>
         <div className="flex items-center gap-1">
+          {onView && (
+            <button
+              onClick={() => onView(cmd)}
+              className="flex items-center gap-1 px-2 py-1 text-xs rounded-md hover:bg-surface-hover text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Eye className="w-3.5 h-3.5" /> View
+            </button>
+          )}
           <button
             onClick={() => {
               const hasVars = /\{\{\w+\}\}/.test(cmd.command);
@@ -191,7 +201,7 @@ export default function CommandCard({
                 copiedTimeoutRef.current = window.setTimeout(() => setJustCopied(false), 1000);
               }
             }}
-            className="flex items-center gap-1 px-2 py-1 text-xs rounded-md hover:bg-surface-hover text-muted-foreground hover:text-foreground transition-colors"
+            className="flex items-center gap-1 px-2 py-1 text-xs rounded-md hover:bg-surface-hover text-muted-foreground hover:text-foreground transition-colors transition-transform active:scale-95"
           >
             {justCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />} {justCopied ? "Copied" : "Copy"}
           </button>

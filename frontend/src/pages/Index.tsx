@@ -9,6 +9,7 @@ import AppSidebar from "@/components/AppSidebar";
 import CommandCard from "@/components/CommandCard";
 import GroupModal from "@/components/GroupModal";
 import CommandModal from "@/components/CommandModal";
+import CommandViewModal from "@/components/CommandViewModal";
 import ExportModal from "@/components/ExportModal";
 import VariableModal from "@/components/VariableModal";
 import DeleteModal from "@/components/DeleteModal";
@@ -150,6 +151,7 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
   const [editGroup, setEditGroup] = useState<Group | null>(null);
   const [cmdModal, setCmdModal] = useState(false);
   const [editCmd, setEditCmd] = useState<Command | null>(null);
+  const [viewCmd, setViewCmd] = useState<Command | null>(null);
   const [exportModal, setExportModal] = useState(false);
   const [exportSelection, setExportSelection] = useState<Command[] | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ type: "command" | "group"; id: number; title: string } | null>(null);
@@ -179,6 +181,7 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
       if (e.key === "Escape") {
         setGroupModal(false);
         setCmdModal(false);
+        setViewCmd(null);
         setDeleteTarget(null);
         setVarModal(null);
         setBulkMoveOpen(false);
@@ -770,6 +773,7 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
                   cmd={cmd}
                   groupColor={vault.data.groups.find(g => g.id === cmd.groupId)?.color}
                   onCopy={handleCopy}
+                  onView={(c) => setViewCmd(c)}
                   onEdit={(c) => { setEditCmd(c); setCmdModal(true); }}
                   onDelete={(c) => setDeleteTarget({ type: "command", id: c.id, title: c.title })}
                   onToggleFavorite={(id) => {
@@ -944,6 +948,13 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
         }}
       />
 
+      <CommandViewModal
+        open={!!viewCmd}
+        command={viewCmd}
+        onClose={() => setViewCmd(null)}
+        onCopy={handleCopy}
+      />
+
       <VariableModal
         open={!!varModal}
         command={varModal?.command ?? ""}
@@ -956,7 +967,7 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
               // ignore
             });
           }
-          setVarModal(null);
+          window.setTimeout(() => setVarModal(null), 700);
         }}
         onCopyRaw={() => {
           if (varModal) {
@@ -965,7 +976,7 @@ function VaultPage({ token, onLogout }: { token: string; onLogout: () => void })
               // ignore
             });
           }
-          setVarModal(null);
+          window.setTimeout(() => setVarModal(null), 700);
         }}
       />
 

@@ -18,6 +18,7 @@ function extractVars(cmd: string): string[] {
 export default function VariableModal({ open, command, defaults, onClose, onCopyWithValues, onCopyRaw }: Props) {
   const vars = extractVars(command);
   const [values, setValues] = useState<Record<string, string>>({});
+  const [copied, setCopied] = useState<"raw" | "values" | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -26,6 +27,7 @@ export default function VariableModal({ open, command, defaults, onClose, onCopy
         init[v] = defaults?.[v] ?? "";
       });
       setValues(init);
+      setCopied(null);
     }
   }, [open, command, defaults]);
 
@@ -36,6 +38,7 @@ export default function VariableModal({ open, command, defaults, onClose, onCopy
     Object.entries(values).forEach(([k, v]) => {
       result = result.split(`{{${k}}}`).join(v);
     });
+    setCopied("values");
     onCopyWithValues(result);
   };
 
@@ -64,8 +67,21 @@ export default function VariableModal({ open, command, defaults, onClose, onCopy
         </div>
 
         <div className="flex justify-end gap-2 mt-6">
-          <button onClick={onCopyRaw} className="px-4 py-2 text-sm rounded-md hover:bg-surface-hover text-muted-foreground transition-colors">Copy as-is</button>
-          <button onClick={replace} className="px-4 py-2 text-sm rounded-md bg-accent-blue text-accent-blue-foreground hover:opacity-90 transition-all font-medium">Copy with values</button>
+          <button
+            onClick={() => {
+              setCopied("raw");
+              onCopyRaw();
+            }}
+            className="px-4 py-2 text-sm rounded-md hover:bg-surface-hover text-muted-foreground transition-colors"
+          >
+            {copied === "raw" ? "Copied" : "Copy as-is"}
+          </button>
+          <button
+            onClick={replace}
+            className="px-4 py-2 text-sm rounded-md bg-accent-blue text-accent-blue-foreground hover:opacity-90 transition-all font-medium"
+          >
+            {copied === "values" ? "Copied" : "Copy with values"}
+          </button>
         </div>
       </div>
     </div>

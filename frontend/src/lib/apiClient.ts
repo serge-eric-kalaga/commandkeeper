@@ -4,6 +4,18 @@ export type ApiError = {
     details?: unknown;
 };
 
+export const AUTH_EVENT_UNAUTHORIZED = "commandkeeper:auth:unauthorized";
+export const AUTH_EVENT_PASSWORD_CHANGE_REQUIRED = "commandkeeper:auth:password-change-required";
+
+function emitAuthEvent(name: string, detail: unknown) {
+    if (typeof window === "undefined") return;
+    try {
+        window.dispatchEvent(new CustomEvent(name, { detail }));
+    } catch {
+        // ignore
+    }
+}
+
 function extractFastApiErrorMessage(body: unknown, status: number): string {
     if (typeof body !== "object" || !body) return `HTTP ${status}`;
 
@@ -87,6 +99,20 @@ export async function apiRequest<T>(
         const message = extractFastApiErrorMessage(body, res.status);
 
         const err: ApiError = { status: res.status, message, details: body };
+
+        // Interceptors for auth-related failures (only when making an authenticated call)
+        if (options.token) {
+            if (res.status === 401) {
+                emitAuthEvent(AUTH_EVENT_UNAUTHORIZED, err);
+            }
+            if (res.status === 403) {
+                const detail = (body as any)?.detail;
+                if (detail === "Password change required") {
+                    emitAuthEvent(AUTH_EVENT_PASSWORD_CHANGE_REQUIRED, err);
+                }
+            }
+        }
+
         throw err;
     }
 

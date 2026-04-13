@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { apiRequest } from "@/lib/apiClient";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { apiRequest, AUTH_EVENT_PASSWORD_CHANGE_REQUIRED, AUTH_EVENT_UNAUTHORIZED } from "@/lib/apiClient";
+import { toast } from "@/components/ui/sonner";
 
 type AuthStorage = {
     token: string | null;
@@ -26,6 +27,15 @@ function saveAuth(value: AuthStorage) {
 export function useAuth() {
     const [auth, setAuth] = useState<AuthStorage>(loadAuth);
 
+    const tokenRef = useRef<string | null>(auth.token);
+    const mustChangePasswordRef = useRef<boolean>(auth.mustChangePassword);
+    const lastToastRef = useRef<{ kind: "unauthorized" | "password-change"; at: number } | null>(null);
+
+    useEffect(() => {
+        tokenRef.current = auth.token;
+        mustChangePasswordRef.current = auth.mustChangePassword;
+    }, [auth.token, auth.mustChangePassword]);
+
     useEffect(() => {
         saveAuth(auth);
     }, [auth]);
@@ -50,6 +60,46 @@ export function useAuth() {
     const logout = useCallback(() => {
         setAuth({ token: null, mustChangePassword: false, username: null });
     }, []);
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+
+        const emitToastOnce = (kind: "unauthorized" | "password-change", message: string) => {
+            const now = Date.now();
+            const last = lastToastRef.current;
+            // Avoid toast spam when several requests fail at once.
+            if (last && last.kind === kind && now - last.at < 2500) return;
+            lastToastRef.current = { kind, at: now };
+            toast(message);
+        };
+
+        const onUnauthorized = () => {
+            if (tokenRef.current) {
+                emitToastOnce("unauthorized", "Session expirée. Veuillez vous reconnecter.");
+            }
+            // Token is no longer valid (or missing) -> force back to login.
+            logout();
+        };
+
+        const onPasswordChangeRequired = () => {
+            // Backend requires changing password before accessing business routes.
+            if (tokenRef.current && !mustChangePasswordRef.current) {
+                emitToastOnce("password-change", "Changement de mot de passe requis pour continuer.");
+            }
+            setAuth((prev) => {
+                if (!prev.token) return prev;
+                if (prev.mustChangePassword) return prev;
+                return { ...prev, mustChangePassword: true };
+            });
+        };
+
+        window.addEventListener(AUTH_EVENT_UNAUTHORIZED, onUnauthorized);
+        window.addEventListener(AUTH_EVENT_PASSWORD_CHANGE_REQUIRED, onPasswordChangeRequired);
+        return () => {
+            window.removeEventListener(AUTH_EVENT_UNAUTHORIZED, onUnauthorized);
+            window.removeEventListener(AUTH_EVENT_PASSWORD_CHANGE_REQUIRED, onPasswordChangeRequired);
+        };
+    }, [logout]);
 
     const changePassword = useCallback(
         async (oldPassword: string, newPassword: string) => {
